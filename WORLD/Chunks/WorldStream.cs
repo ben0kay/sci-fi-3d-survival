@@ -1,4 +1,4 @@
-// Streams terrain around the player using one background calculation at a time.
+// Streams terrain around the player and exposes the world's current single-biome assignment.
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -15,10 +15,13 @@ public partial class WorldStream : Node
     #endregion
 
     #region State
+    public static readonly StringName BiomeGroup = "world_biomes";
+
     private readonly Dictionary<Vector2I, Node3D> _chunks = new();
     private readonly List<Vector2I> _pending = new();
     private readonly List<Vector2I> _remove = new();
     private TerrainBuilder _terrain;
+    private BiomeDefinition _biome;
     private StandardMaterial3D _groundMaterial;
     private Player _player;
     private Task<TerrainBuilder.ChunkData> _buildTask;
@@ -28,7 +31,7 @@ public partial class WorldStream : Node
     #endregion
 
     #region Lifecycle
-    // Create a safe starting area before spawning the player.
+    // Prepare the assigned biome and safe starting terrain before spawning the player.
     // =========================================================
     public override void _Ready()
     {
@@ -38,10 +41,12 @@ public partial class WorldStream : Node
             return;
         }
 
+        _biome = Settings.Biome;
+        AddToGroup(BiomeGroup);
         _terrain = new TerrainBuilder(Settings);
         _groundMaterial = new StandardMaterial3D
         {
-            AlbedoColor = Settings.GroundColour,
+            AlbedoColor = _biome.GroundColour,
             Roughness = 1f
         };
 
@@ -53,6 +58,7 @@ public partial class WorldStream : Node
         if (instance is not Player player)
         {
             instance.Free();
+            RemoveFromGroup(BiomeGroup);
             GD.PushError("WorldStream: PlayerScene must have a Player root.");
             SetProcess(false);
             return;
@@ -115,6 +121,15 @@ public partial class WorldStream : Node
     public override void _ExitTree()
     {
         _running = false;
+    }
+    #endregion
+
+    #region Biome Queries
+    // Return the assigned test biome; position is reserved for future regional sampling.
+    // =========================================================
+    public BiomeDefinition GetBiomeAt(Vector3 worldPosition)
+    {
+        return _biome;
     }
     #endregion
 
@@ -234,7 +249,7 @@ public partial class WorldStream : Node
         _chunks.Add(data.Coordinate, chunk);
     }
 
-    // Report invalid references or settings before attempting generation.
+    // Validate scene references, streaming settings, and the assigned biome.
     // =========================================================
     private bool ValidateConfiguration()
     {
@@ -244,10 +259,17 @@ public partial class WorldStream : Node
             return false;
         }
 
+        if (Settings.Biome == null)
+        {
+            GD.PushError("WorldStream: assign a biome in World Settings.");
+            return false;
+        }
+
+        if (!Settings.Biome.Validate()) return false;
+
         if (Settings.ChunkSize < 8 || Settings.Segments < 4 ||
-            Settings.HeightAmplitude < 0f || Settings.HillSize <= 0f ||
             Settings.LoadRadius < 2 || Settings.UnloadRadius <= Settings.LoadRadius ||
-            Settings.CheckInterval <= 0f)
+            !float.IsFinite(Settings.CheckInterval) || Settings.CheckInterval <= 0f)
         {
             GD.PushError("WorldStream: invalid settings. UnloadRadius must exceed LoadRadius.");
             return false;

@@ -1,4 +1,4 @@
-// Displays a temporary FPS counter independently from gameplay.
+// Displays FPS and the biome at the player position without affecting gameplay.
 using Godot;
 
 public partial class DebugHud : CanvasLayer
@@ -13,21 +13,25 @@ public partial class DebugHud : CanvasLayer
 
     #region State
     private Label _label;
+    private Node3D _host;
+    private WorldStream _world;
     private double _timer;
     #endregion
 
     #region Lifecycle
-    // Create a mouse-transparent label in the top-left corner.
+    // Create the label and resolve the player and world references once.
     // =========================================================
     public override void _Ready()
     {
         Layer = 100;
+        _host = GetParent() as Node3D;
+        _world = GetTree().GetFirstNodeInGroup(WorldStream.BiomeGroup) as WorldStream;
+
         _label = new Label
         {
-            Name = "FPS",
+            Name = "DebugText",
             Position = ScreenOffset,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            Text = "FPS: --"
+            MouseFilter = Control.MouseFilterEnum.Ignore
         };
 
         _label.AddThemeFontSizeOverride("font_size", FontSize);
@@ -35,10 +39,15 @@ public partial class DebugHud : CanvasLayer
         _label.AddThemeColorOverride("font_outline_color", Colors.Black);
         _label.AddThemeConstantOverride("outline_size", 4);
         AddChild(_label);
+
+        if (_host == null)
+            GD.PushWarning("DebugHud: attach this HUD directly beneath the player.");
+
         Visible = Enabled;
+        UpdateDisplay();
     }
 
-    // Refresh the counter periodically instead of formatting text every frame.
+    // Refresh the display periodically instead of formatting text every frame.
     // =========================================================
     public override void _Process(double delta)
     {
@@ -48,7 +57,23 @@ public partial class DebugHud : CanvasLayer
         _timer += delta;
         if (_timer < UpdateInterval) return;
         _timer = 0;
-        _label.Text = $"FPS: {Engine.GetFramesPerSecond()}";
+        UpdateDisplay();
+    }
+    #endregion
+
+    #region Display
+    // Show the biome name, with a neutral fallback for the separate sandbox.
+    // =========================================================
+    private void UpdateDisplay()
+    {
+        string biomeName = "None";
+        if (GodotObject.IsInstanceValid(_world) && GodotObject.IsInstanceValid(_host))
+        {
+            BiomeDefinition biome = _world.GetBiomeAt(_host.GlobalPosition);
+            if (biome != null) biomeName = biome.DisplayName;
+        }
+
+        _label.Text = $"FPS: {Engine.GetFramesPerSecond()}\nBiome: {biomeName}";
     }
     #endregion
 }

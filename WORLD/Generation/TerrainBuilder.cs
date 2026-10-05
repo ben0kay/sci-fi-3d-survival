@@ -21,16 +21,16 @@ public sealed class TerrainBuilder
     #endregion
 
     #region Construction
-    // Copy settings on the main thread so worker calculations use immutable values.
-    // =========================================================
-    public TerrainBuilder(WorldSettings settings)
-    {
-        ChunkSize = settings.ChunkSize;
-        _segments = settings.Segments;
-        _seed = settings.Seed;
-        _heightAmplitude = settings.HeightAmplitude;
-        _hillSize = settings.HillSize;
-    }
+// Copy world and biome settings on the main thread before worker calculations begin.
+ // =========================================================
+public TerrainBuilder(WorldSettings settings)
+{
+    ChunkSize = settings.ChunkSize;
+    _segments = settings.Segments;
+    _seed = settings.Seed;
+    _heightAmplitude = settings.Biome.HeightAmplitude;
+    _hillSize = settings.Biome.HillSize;
+}
     #endregion
 
     #region Sampling

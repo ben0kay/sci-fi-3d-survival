@@ -1,13 +1,15 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://PLAYER/Player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://WORLD/Chunks/WorldStream.cs" id="2_stream"]
 [ext_resource type="Script" path="res://WORLD/Generation/WorldSettings.cs" id="3_settings"]
-[ext_resource type="PackedScene" path="res://ENVIRONMENT/Atmosphere/fog/Fog.tscn" id="4_fog"]
+[ext_resource type="PackedScene" path="res://ENVIRONMENT/Atmosphere/Fog/Fog.tscn" id="4_fog"]
 [ext_resource type="PackedScene" path="res://ENVIRONMENT/Lighting/Lighting.tscn" id="5_lighting"]
+[ext_resource type="Resource" path="res://WORLD/Biomes/Definitions/TestPlains.tres" id="6_biome"]
 
 [sub_resource type="Resource" id="Settings_world"]
 script = ExtResource("3_settings")
+Biome = ExtResource("6_biome")
 
 [node name="World" type="Node3D"]
 
