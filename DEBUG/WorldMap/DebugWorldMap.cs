@@ -1,4 +1,4 @@
-// Displays a cached top-down biome and terrain preview without loading world chunks.
+// Displays cached biome and terrain maps, including random seed previews, without loading chunks.
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -25,26 +25,29 @@ public partial class DebugWorldMap : CanvasLayer
     private VBoxContainer _legend;
     private Player _player;
     private TerrainBuilder _terrain;
+    private WorldSettings _previewSettings;
+    private BiomeMap _previewBiomes;
     private Image _image;
     private ImageTexture _texture;
+
     private readonly HashSet<string> _legendIds = new();
     private readonly Stopwatch _budget = new();
 
     private Vector2 _centre, _viewportSize;
     private Input.MouseModeEnum _previousMouseMode;
-    private int _pixel, _resolution;
+    private int _pixel, _resolution, _previewSeed;
     private float _span, _contourSpacing;
-    private bool _open, _building, _hasMap;
+    private bool _open, _building, _hasMap, _randomPreview;
     #endregion
 
     #region Lifecycle
-    // Build the overlay and keep all map work disabled until it is opened.
+    // Validate the world reference and prepare a hidden debug overlay.
     // =========================================================
     public override void _Ready()
     {
-        if (World == null)
+        if (World == null || World.Settings == null)
         {
-            GD.PushError("DebugWorldMap: assign the WorldStream reference.");
+            GD.PushError("DebugWorldMap: assign a WorldStream with valid Settings.");
             SetProcess(false);
             SetProcessInput(false);
             return;
@@ -56,7 +59,7 @@ public partial class DebugWorldMap : CanvasLayer
         SetProcess(false);
     }
 
-    // Spend a bounded amount of time generating pixels and update the player marker.
+    // Generate pixels within the frame budget and update map layout and marker.
     // =========================================================
     public override void _Process(double delta)
     {
@@ -67,16 +70,17 @@ public partial class DebugWorldMap : CanvasLayer
         UpdateMarker();
     }
 
-    // Restore cursor state if the debug overlay is removed while open.
+    // Restore cursor state and release owned preview resources.
     // =========================================================
     public override void _ExitTree()
     {
         if (_open) Input.MouseMode = _previousMouseMode;
+        ReleasePreview();
     }
     #endregion
 
     #region Input
-    // Toggle the map and consume mouse input while it covers the game.
+    // Toggle the map, request previews, and consume input while the overlay is open.
     // =========================================================
     public override void _Input(InputEvent inputEvent)
     {
@@ -91,6 +95,20 @@ public partial class DebugWorldMap : CanvasLayer
 
             if (_open && key.PhysicalKeycode == Key.R)
             {
+                int previousSeed = _previewSeed;
+                do { _previewSeed = (int)(GD.Randi() & 0x7FFFFFFFu); }
+                while (_previewSeed == previousSeed ||
+                       _previewSeed == World.Settings.Seed);
+
+                _randomPreview = true;
+                BeginBuild();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (_open && key.PhysicalKeycode == Key.C)
+            {
+                _randomPreview = false;
                 BeginBuild();
                 GetViewport().SetInputAsHandled();
                 return;
@@ -109,7 +127,7 @@ public partial class DebugWorldMap : CanvasLayer
             GetViewport().SetInputAsHandled();
     }
 
-    // Release the mouse while open and reuse the previous map whenever possible.
+    // Release the cursor while open and retain the cached map between openings.
     // =========================================================
     private void ToggleMap()
     {
@@ -133,7 +151,7 @@ public partial class DebugWorldMap : CanvasLayer
     #endregion
 
     #region Interface
-    // Create the complete interface inside this helper node.
+    // Create the map interface inside this isolated helper node.
     // =========================================================
     private void CreateInterface()
     {
@@ -151,7 +169,7 @@ public partial class DebugWorldMap : CanvasLayer
 
         _title = new Label
         {
-            Text = "WORLD MAP — M / Esc: close   •   R: recenter / rebuild",
+            Text = "WORLD MAP — M / Esc: close   •   R: random seed   •   C: current world",
             Position = new Vector2(24, 12),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };
@@ -187,7 +205,7 @@ public partial class DebugWorldMap : CanvasLayer
         _overlay.AddChild(_status);
     }
 
-    // Keep the map square and reserve a right-hand column for the legend.
+    // Keep the terrain preview square with space beside it for the legend.
     // =========================================================
     private void UpdateLayout()
     {
@@ -204,7 +222,7 @@ public partial class DebugWorldMap : CanvasLayer
         _status.Position = new Vector2(24, mapSize + 68);
     }
 
-    // Add each encountered biome to the map legend once.
+    // Add a colour key for each biome encountered in the preview.
     // =========================================================
     private void AddLegend(BiomeDefinition biome, Color colour)
     {
@@ -223,13 +241,35 @@ public partial class DebugWorldMap : CanvasLayer
     #endregion
 
     #region Map Generation
-    // Snapshot terrain settings and begin a new player-centred preview.
+    // Snapshot settings and start a preview without changing the active world.
     // =========================================================
     private void BeginBuild()
     {
-        if (World.Settings == null)
+        WorldSettings settings = World.Settings;
+        if (settings.Biomes == null ||
+            (settings.Biomes.Count == 0 && settings.Biome == null))
         {
-            GD.PushError("DebugWorldMap: WorldStream has no Settings.");
+            GD.PushError("DebugWorldMap: assign at least one biome in World Settings.");
+            return;
+        }
+
+        int count = settings.Biomes.Count > 0 ? settings.Biomes.Count : 1;
+        for (int i = 0; i < count; i++)
+        {
+            BiomeDefinition biome = settings.Biomes.Count > 0
+                ? settings.Biomes[i] : settings.Biome;
+
+            if (biome == null || !biome.Validate())
+            {
+                GD.PushError($"DebugWorldMap: invalid biome at index {i}.");
+                return;
+            }
+        }
+
+        float regionSize = settings.BiomeSize * settings.BiomeSizeMultiplier;
+        if (!float.IsFinite(regionSize) || regionSize <= 0f)
+        {
+            GD.PushError("DebugWorldMap: biome region size must be finite and positive.");
             return;
         }
 
@@ -243,11 +283,16 @@ public partial class DebugWorldMap : CanvasLayer
         _contourSpacing = float.IsFinite(ContourSpacing)
             ? MathF.Max(1f, ContourSpacing) : 5f;
 
-        _terrain = new TerrainBuilder(World.Settings);
+        ReleasePreview();
+        if (!_randomPreview) _previewSeed = settings.Seed;
+
+        _previewSettings = (WorldSettings)settings.Duplicate();
+        _previewSettings.Seed = _previewSeed;
+        _previewBiomes = new BiomeMap(_previewSettings, count);
+        _terrain = new TerrainBuilder(_previewSettings);
         _image = Image.CreateEmpty(
             _resolution, _resolution, false, Image.Format.Rgba8);
 
-        _map.Texture = null;
         _marker.Hide();
         _hasMap = false;
         _building = true;
@@ -260,10 +305,10 @@ public partial class DebugWorldMap : CanvasLayer
             child.QueueFree();
         }
 
-        _status.Text = "Generating map…";
+        _status.Text = $"Generating seed {_previewSeed}…";
     }
 
-    // Sample the existing terrain generator without creating meshes or collision.
+    // Sample terrain and biomes gradually without generating world meshes.
     // =========================================================
     private void BuildPixels()
     {
@@ -274,16 +319,16 @@ public partial class DebugWorldMap : CanvasLayer
         int total = _resolution * _resolution;
         double budgetMs = float.IsFinite(BuildBudgetMs)
             ? Math.Clamp(BuildBudgetMs, 0.5f, 5f) : 2f;
+        Vector3 light = new Vector3(-0.6f, 1f, -0.4f).Normalized();
 
-        while (_pixel < total && _budget.Elapsed.TotalMilliseconds < budgetMs)
+        while (_pixel < total &&
+               _budget.Elapsed.TotalMilliseconds < budgetMs)
         {
             int x = _pixel % _resolution, z = _pixel / _resolution;
             float worldX = startX + (x + 0.5f) * step;
             float worldZ = startZ + (z + 0.5f) * step;
 
-            BiomeDefinition biome = World.GetBiomeAt(
-                new Vector3(worldX, 0f, worldZ));
-
+            BiomeDefinition biome = GetPreviewBiome(worldX, worldZ);
             Color baseColour = GetBiomeColour(biome.Id);
             AddLegend(biome, baseColour);
 
@@ -294,21 +339,22 @@ public partial class DebugWorldMap : CanvasLayer
                 _terrain.SampleHeight(worldX, worldZ + step) - height) / step;
 
             Vector3 normal = new Vector3(-slopeX, 1f, -slopeZ).Normalized();
-            Vector3 light = new Vector3(-0.6f, 1f, -0.4f).Normalized();
-            float shade = Math.Clamp(0.65f + normal.Dot(light) * 0.35f, 0.35f, 1f);
+            float shade = Math.Clamp(
+                0.65f + normal.Dot(light) * 0.35f, 0.35f, 1f);
             Color colour = baseColour * shade;
             colour.A = 1f;
 
             float contour = height / _contourSpacing;
             float fraction = contour - MathF.Floor(contour);
-            if (fraction < 0.055f && MathF.Abs(slopeX) + MathF.Abs(slopeZ) > 0.025f)
+            if (fraction < 0.055f &&
+                MathF.Abs(slopeX) + MathF.Abs(slopeZ) > 0.025f)
                 colour = colour.Lerp(Colors.Black, 0.3f);
 
             _image.SetPixel(x, z, colour);
             _pixel++;
         }
 
-        _status.Text = $"Generating map… {_pixel * 100 / total}%";
+        _status.Text = $"Generating seed {_previewSeed}… {_pixel * 100 / total}%";
         if (_pixel < total) return;
 
         _texture = ImageTexture.CreateFromImage(_image);
@@ -320,7 +366,15 @@ public partial class DebugWorldMap : CanvasLayer
         _hasMap = true;
     }
 
-    // Assign stable, distinct debug colours independently from ground materials.
+    // Select biomes with the same seed used by the preview terrain.
+    // =========================================================
+    private BiomeDefinition GetPreviewBiome(float x, float z)
+    {
+        if (_previewSettings.Biomes.Count == 0) return _previewSettings.Biome;
+        return _previewSettings.Biomes[_previewBiomes.GetIndex(x, z)];
+    }
+
+    // Assign stable debug colours independently of ground material colours.
     // =========================================================
     private static Color GetBiomeColour(string id)
     {
@@ -339,10 +393,28 @@ public partial class DebugWorldMap : CanvasLayer
                 }
         }
     }
+
+    // Release resources from a completed or interrupted preview.
+    // =========================================================
+    private void ReleasePreview()
+    {
+        _building = false;
+        _hasMap = false;
+        _terrain = null;
+        _previewBiomes = null;
+
+        if (GodotObject.IsInstanceValid(_map)) _map.Texture = null;
+        _texture?.Dispose();
+        _texture = null;
+        _image?.Dispose();
+        _image = null;
+        _previewSettings?.Dispose();
+        _previewSettings = null;
+    }
     #endregion
 
     #region Player Marker
-    // Find the spawned player through the world's existing Actors reference.
+    // Locate the spawned player through the world's Actors reference.
     // =========================================================
     private void FindPlayer()
     {
@@ -356,13 +428,29 @@ public partial class DebugWorldMap : CanvasLayer
             }
     }
 
-    // Plot the player's actual X/Z position over the cached terrain preview.
+    // Display the player on the active-world map and label random previews clearly.
     // =========================================================
     private void UpdateMarker()
     {
-        if (!_hasMap || !GodotObject.IsInstanceValid(_player))
+        if (!_hasMap)
         {
             _marker.Hide();
+            return;
+        }
+
+        if (_randomPreview)
+        {
+            _marker.Hide();
+            _status.Text =
+                $"RANDOM PREVIEW — Seed {_previewSeed}   |   {_span:0} × {_span:0} units\n" +
+                "R: another seed   •   C: current world   •   Top = −Z, Right = +X";
+            return;
+        }
+
+        if (!GodotObject.IsInstanceValid(_player))
+        {
+            _marker.Hide();
+            _status.Text = $"CURRENT WORLD — Seed {_previewSeed}";
             return;
         }
 
@@ -371,16 +459,19 @@ public partial class DebugWorldMap : CanvasLayer
             new Vector2(position.X, position.Z) - _centre) / _span +
             new Vector2(0.5f, 0.5f);
 
-        bool inside = uv.X >= 0f && uv.X <= 1f && uv.Y >= 0f && uv.Y <= 1f;
+        bool inside = uv.X >= 0f && uv.X <= 1f &&
+                      uv.Y >= 0f && uv.Y <= 1f;
+
         _marker.Visible = inside;
-        _marker.Position = _map.Position + uv * _map.Size - _marker.Size * 0.5f;
+        _marker.Position = _map.Position +
+                           uv * _map.Size - _marker.Size * 0.5f;
 
         string biome = World.GetBiomeAt(position).DisplayName;
         _status.Text =
-            $"{_span:0} × {_span:0} world units   |   " +
+            $"Seed {_previewSeed}   |   {_span:0} × {_span:0} units   |   " +
             $"X {position.X:0}, Z {position.Z:0}   |   {biome}\n" +
             "Top = −Z   •   Right = +X   •   Dark lines = height contours" +
-            (inside ? "" : "   •   Outside map: press R");
+            (inside ? "" : "   •   Outside map: press C to recenter");
     }
     #endregion
 }
