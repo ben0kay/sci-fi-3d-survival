@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="PackedScene" path="res://PLAYER/player.tscn" id="1_player"]
-[ext_resource type="Script" path="res://WORLD/GENERATION/SandboxGeneration.cs" id="2_generation"]
+[ext_resource type="PackedScene" path="res://PLAYER/Player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://WORLD/Generation/SandboxGeneration.cs" id="2_generation"]
 
 [sub_resource type="Environment" id="Environment_sandbox"]
 background_mode = 1

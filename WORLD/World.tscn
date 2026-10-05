@@ -1,0 +1,29 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://PLAYER/Player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://WORLD/Chunks/WorldStream.cs" id="2_stream"]
+[ext_resource type="Script" path="res://WORLD/Generation/WorldSettings.cs" id="3_settings"]
+[ext_resource type="PackedScene" path="res://ENVIRONMENT/Atmosphere/fog/Fog.tscn" id="4_fog"]
+[ext_resource type="PackedScene" path="res://ENVIRONMENT/Lighting/Lighting.tscn" id="5_lighting"]
+
+[sub_resource type="Resource" id="Settings_world"]
+script = ExtResource("3_settings")
+
+[node name="World" type="Node3D"]
+
+[node name="Environment" type="Node" parent="."]
+
+[node name="Fog" parent="Environment" instance=ExtResource("4_fog")]
+
+[node name="Lighting" parent="Environment" instance=ExtResource("5_lighting")]
+
+[node name="Chunks" type="Node3D" parent="."]
+
+[node name="Actors" type="Node3D" parent="."]
+
+[node name="Streaming" type="Node" parent="." node_paths=PackedStringArray("Actors", "ChunkRoot")]
+script = ExtResource("2_stream")
+PlayerScene = ExtResource("1_player")
+Actors = NodePath("../Actors")
+ChunkRoot = NodePath("../Chunks")
+Settings = SubResource("Settings_world")
