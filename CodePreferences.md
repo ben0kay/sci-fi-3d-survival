@@ -2,6 +2,8 @@ I prefer comments above functions/methods. along with a commented line of ======
 I prefer some comment at top of each script to explain what the script is doing.
 I prefer you organizing functions/methods into regions when appropriate.
 I prefer to organize my scripts for ease of finding in future etc.
+I like Data Driven Systems.
+I don't like adding lots of file paths in areas in case i need to move files/folders around. we should plan folder hiearchy early on to avoid this.
 I do like you to vertically compress code where possible, so it's a little easier to read on screen.
 I prefer you to give me the full functions/methods pasted in chat. never updated my github or give me a ZIP file. ALWAYS give me the updates in CHAT to copy and paste myself
 Please keep in mind I like optimization where possible too. Performance oriented.
