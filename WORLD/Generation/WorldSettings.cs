@@ -1,12 +1,15 @@
-// Stores world-level generation and streaming settings, with one assigned test biome.
+// Stores global generation, biome-region, and chunk-streaming settings.
 using Godot;
 
 [GlobalClass]
 public partial class WorldSettings : Resource
 {
-    #region Biome
-    [ExportGroup("Biome")]
+    #region Biomes
+    [ExportGroup("Biomes")]
     [Export] public BiomeDefinition Biome { get; set; }
+    [Export] public Godot.Collections.Array<BiomeDefinition> Biomes { get; set; } = new();
+    [Export(PropertyHint.Range, "192,2048,1")] public float BiomeSize { get; set; } = 384f;
+    [Export(PropertyHint.Range, "0.5,8,0.1")] public float BiomeSizeMultiplier { get; set; } = 1f;
     #endregion
 
     #region Generation

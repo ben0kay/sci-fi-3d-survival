@@ -6,19 +6,22 @@
 
 [resource]
 script = ExtResource("1_biome")
-Id = "test_plains"
-DisplayName = "Test Plains"
-Description = "Mostly flat ground, bushes, and occasional trees."
-HeightAmplitude = 3.0
-HillSize = 128.0
-MountainHeight = 0.0
-FlatAreaSize = 128.0
-FlatAreaCoverage = 0.65
-FlatTransitionWidth = 0.3
-GroundColour = Color(0.32, 0.38, 0.28, 1)
+Id = "rocky_mountains"
+DisplayName = "Rocky Mountains"
+Description = "Broad mountain ridges, scarce vegetation, and very few flat areas."
+HeightAmplitude = 8.0
+HillSize = 160.0
+MountainHeight = 36.0
+MountainSize = 256.0
+MountainCoverage = 1.0
+MountainSharpness = 1.5
+FlatAreaSize = 256.0
+FlatAreaCoverage = 0.02
+FlatTransitionWidth = 0.5
+GroundColour = Color(0.38, 0.37, 0.35, 1)
 Tree = ExtResource("2_tree")
 TreesPerChunk = 1
 Bush = ExtResource("3_bush")
-BushesPerChunk = 12
-TreeSlopeRange = Vector2(15, 30)
-BushSlopeRange = Vector2(25, 45)
+BushesPerChunk = 2
+TreeSlopeRange = Vector2(12, 28)
+BushSlopeRange = Vector2(22, 42)

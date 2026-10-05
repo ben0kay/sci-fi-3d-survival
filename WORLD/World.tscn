@@ -1,29 +1,35 @@
-[gd_scene format=3 uid="uid://j12pinbbsl06"]
+[gd_scene load_steps=11 format=3 uid="uid://j12pinbbsl06"]
 
-[ext_resource type="PackedScene" uid="uid://jrtpkspbeqob" path="res://PLAYER/Player.tscn" id="1_player"]
-[ext_resource type="Script" uid="uid://do3nur2jlgb8c" path="res://WORLD/Chunks/WorldStream.cs" id="2_stream"]
-[ext_resource type="Script" uid="uid://du3gd7x24s52" path="res://WORLD/Generation/WorldSettings.cs" id="3_settings"]
+[ext_resource type="PackedScene" path="res://PLAYER/Player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://WORLD/Chunks/WorldStream.cs" id="2_stream"]
+[ext_resource type="Script" path="res://WORLD/Generation/WorldSettings.cs" id="3_settings"]
 [ext_resource type="PackedScene" path="res://ENVIRONMENT/Atmosphere/Fog/Fog.tscn" id="4_fog"]
 [ext_resource type="PackedScene" path="res://ENVIRONMENT/Lighting/Lighting.tscn" id="5_lighting"]
-[ext_resource type="Resource" path="res://WORLD/Biomes/Definitions/TestPlains.tres" id="6_biome"]
+[ext_resource type="Resource" path="res://WORLD/Biomes/Definitions/TestPlains.tres" id="6_plains"]
+[ext_resource type="Resource" path="res://WORLD/Biomes/Definitions/RollingHillForest.tres" id="7_forest"]
+[ext_resource type="Resource" path="res://WORLD/Biomes/Definitions/RockyMountains.tres" id="8_mountains"]
+[ext_resource type="Script" path="res://WORLD/Biomes/BiomeDefinition.cs" id="9_biome_type"]
 
 [sub_resource type="Resource" id="Settings_world"]
 script = ExtResource("3_settings")
-Biome = ExtResource("6_biome")
+Biome = ExtResource("6_plains")
+Biomes = Array[ExtResource("9_biome_type")]([ExtResource("6_plains"), ExtResource("7_forest"), ExtResource("8_mountains")])
+BiomeSize = 384.0
+BiomeSizeMultiplier = 1.0
 
-[node name="World" type="Node3D" unique_id=1234203064]
+[node name="World" type="Node3D"]
 
-[node name="Environment" type="Node" parent="." unique_id=1394454346]
+[node name="Environment" type="Node" parent="."]
 
-[node name="Fog" parent="Environment" unique_id=1655709551 instance=ExtResource("4_fog")]
+[node name="Fog" parent="Environment" instance=ExtResource("4_fog")]
 
-[node name="Lighting" parent="Environment" unique_id=880138599 instance=ExtResource("5_lighting")]
+[node name="Lighting" parent="Environment" instance=ExtResource("5_lighting")]
 
-[node name="Chunks" type="Node3D" parent="." unique_id=549582185]
+[node name="Chunks" type="Node3D" parent="."]
 
-[node name="Actors" type="Node3D" parent="." unique_id=1617045981]
+[node name="Actors" type="Node3D" parent="."]
 
-[node name="Streaming" type="Node" parent="." unique_id=420359125 node_paths=PackedStringArray("Actors", "ChunkRoot")]
+[node name="Streaming" type="Node" parent="." node_paths=PackedStringArray("Actors", "ChunkRoot")]
 script = ExtResource("2_stream")
 PlayerScene = ExtResource("1_player")
 Actors = NodePath("../Actors")

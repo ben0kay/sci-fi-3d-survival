@@ -11,6 +11,7 @@ public sealed class TerrainBuilder
         public Vector3[] Vertices;
         public Vector3[] Normals;
         public int[] Indices;
+        public Color[] Colours;
     }
     #endregion
 
@@ -21,14 +22,40 @@ private readonly float _heightAmplitude, _hillSize;
 private readonly float _flatAreaSize, _flatAreaCoverage, _flatTransitionWidth;
 private readonly float _mountainHeight, _mountainSize;
 private readonly float _mountainCoverage, _mountainSharpness;
+private readonly TerrainBuilder[] _profiles;
+private readonly Color[] _colours;
+private readonly BiomeMap _biomeMap;
+
 #endregion
 
 #region Construction
-// Copy terrain values before background chunk generation begins.
+// Prepare independent biome profiles and the shared regional map.
 // =========================================================
 public TerrainBuilder(WorldSettings settings)
 {
-    BiomeDefinition biome = settings.Biome;
+    ChunkSize = settings.ChunkSize;
+    _segments = settings.Segments;
+    _seed = settings.Seed;
+
+    int count = settings.Biomes.Count > 0 ? settings.Biomes.Count : 1;
+    _profiles = new TerrainBuilder[count];
+    _colours = new Color[count];
+    _biomeMap = new BiomeMap(settings, count);
+
+    for (int i = 0; i < count; i++)
+    {
+        BiomeDefinition biome = settings.Biomes.Count > 0
+            ? settings.Biomes[i] : settings.Biome;
+
+        _profiles[i] = new TerrainBuilder(settings, biome);
+        _colours[i] = biome.GroundColour;
+    }
+}
+
+// Copy one biome's terrain values without retaining Resource access in workers.
+// =========================================================
+private TerrainBuilder(WorldSettings settings, BiomeDefinition biome)
+{
     ChunkSize = settings.ChunkSize;
     _segments = settings.Segments;
     _seed = settings.Seed;
@@ -45,9 +72,32 @@ public TerrainBuilder(WorldSettings settings)
 #endregion
 
 #region Sampling
-// Combine rolling hills and regional mountains while preserving flat plains.
+// Blend neighbouring biome heights using shared world-space coordinates.
 // =========================================================
 public float SampleHeight(float x, float z)
+{
+    BiomeMap.Blend blend = _biomeMap.Sample(x, z);
+    float height = 0f;
+
+    height += WeightedHeight(blend.A, (1f - blend.X) * (1f - blend.Z), x, z);
+    height += WeightedHeight(blend.B, blend.X * (1f - blend.Z), x, z);
+    height += WeightedHeight(blend.C, (1f - blend.X) * blend.Z, x, z);
+    height += WeightedHeight(blend.D, blend.X * blend.Z, x, z);
+
+    return height;
+}
+
+// Skip unused biome samples in pure region interiors.
+// =========================================================
+private float WeightedHeight(int index, float weight, float x, float z)
+{
+    return weight <= 0f ? 0f :
+        _profiles[index].SampleProfileHeight(x, z) * weight;
+}
+
+// Combine one biome's hills, mountains, and flat-area mask.
+// =========================================================
+private float SampleProfileHeight(float x, float z)
 {
     if (_flatAreaCoverage >= 1f) return 0f;
 
@@ -62,8 +112,8 @@ public float SampleHeight(float x, float z)
             x / (_hillSize * 0.35f),
             z / (_hillSize * 0.35f), _seed ^ 7919);
 
-        hillHeight = ((broad - 0.5f) + (detail - 0.5f) * 0.25f) *
-                     _heightAmplitude;
+        hillHeight = ((broad - 0.5f) +
+                     (detail - 0.5f) * 0.25f) * _heightAmplitude;
     }
 
     return (hillHeight + SampleMountainHeight(x, z)) * terrainStrength;
@@ -121,52 +171,67 @@ private Vector3 SampleNormal(float x, float z)
 
     return new Vector3(left - right, 1f, back - front).Normalized();
 }
+
+// Blend ground colour with the same weights used for terrain height.
+// =========================================================
+private Color SampleColour(float x, float z)
+{
+    BiomeMap.Blend blend = _biomeMap.Sample(x, z);
+    Color top = _colours[blend.A].Lerp(_colours[blend.B], blend.X);
+    Color bottom = _colours[blend.C].Lerp(_colours[blend.D], blend.X);
+    return top.Lerp(bottom, blend.Z);
+}
 #endregion
 
     #region Mesh Generation
-    // Generate vertices, normals, and clockwise triangle indices for one chunk.
-    // =========================================================
-    public ChunkData Build(Vector2I coordinate)
+// Generate continuous terrain, normals, colours, and triangle indices.
+// =========================================================
+public ChunkData Build(Vector2I coordinate)
+{
+    int stride = _segments + 1;
+    int count = stride * stride;
+    var data = new ChunkData
     {
-        int stride = _segments + 1;
-        int count = stride * stride;
-        var data = new ChunkData
-        {
-            Coordinate = coordinate,
-            Vertices = new Vector3[count],
-            Normals = new Vector3[count],
-            Indices = new int[_segments * _segments * 6]
-        };
+        Coordinate = coordinate,
+        Vertices = new Vector3[count],
+        Normals = new Vector3[count],
+        Colours = new Color[count],
+        Indices = new int[_segments * _segments * 6]
+    };
 
-        float spacing = (float)ChunkSize / _segments;
-        float originX = coordinate.X * (float)ChunkSize;
-        float originZ = coordinate.Y * (float)ChunkSize;
+    float spacing = (float)ChunkSize / _segments;
+    float originX = coordinate.X * (float)ChunkSize;
+    float originZ = coordinate.Y * (float)ChunkSize;
 
-        for (int z = 0; z <= _segments; z++)
-        for (int x = 0; x <= _segments; x++)
-        {
-            int index = z * stride + x;
-            float localX = x * spacing, localZ = z * spacing;
-            float worldX = originX + localX, worldZ = originZ + localZ;
-            data.Vertices[index] = new Vector3(localX, SampleHeight(worldX, worldZ), localZ);
-            data.Normals[index] = SampleNormal(worldX, worldZ);
-        }
+    for (int z = 0; z <= _segments; z++)
+    for (int x = 0; x <= _segments; x++)
+    {
+        int index = z * stride + x;
+        float localX = x * spacing, localZ = z * spacing;
+        float worldX = originX + localX, worldZ = originZ + localZ;
 
-        int write = 0;
-        for (int z = 0; z < _segments; z++)
-        for (int x = 0; x < _segments; x++)
-        {
-            int a = z * stride + x, b = a + 1, c = a + stride, d = c + 1;
-            data.Indices[write++] = a;
-            data.Indices[write++] = b;
-            data.Indices[write++] = c;
-            data.Indices[write++] = b;
-            data.Indices[write++] = d;
-            data.Indices[write++] = c;
-        }
-
-        return data;
+        data.Vertices[index] = new Vector3(
+            localX, SampleHeight(worldX, worldZ), localZ);
+        data.Normals[index] = SampleNormal(worldX, worldZ);
+        data.Colours[index] = SampleColour(worldX, worldZ);
     }
+
+    int write = 0;
+    for (int z = 0; z < _segments; z++)
+    for (int x = 0; x < _segments; x++)
+    {
+        int a = z * stride + x, b = a + 1;
+        int c = a + stride, d = c + 1;
+        data.Indices[write++] = a;
+        data.Indices[write++] = b;
+        data.Indices[write++] = c;
+        data.Indices[write++] = b;
+        data.Indices[write++] = d;
+        data.Indices[write++] = c;
+    }
+
+    return data;
+}
     #endregion
 
     #region Noise

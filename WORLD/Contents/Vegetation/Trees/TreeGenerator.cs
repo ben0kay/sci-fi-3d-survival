@@ -13,37 +13,36 @@ public sealed class TreeGenerator
     #endregion
 
     #region Construction
-    // Copy configuration and create one shared trunk mesh on the main thread.
-    // =========================================================
-    public TreeGenerator(WorldSettings settings)
+// Create one shared trunk mesh for the supplied biome.
+// =========================================================
+public TreeGenerator(WorldSettings settings, BiomeDefinition biome = null)
+{
+    biome ??= settings.Biome;
+    _seed = settings.Seed;
+    _count = biome.TreesPerChunk;
+    _chunkSize = settings.ChunkSize;
+    _segments = settings.Segments;
+
+    TreeDefinition definition = biome.Tree;
+    if (_count == 0 || definition == null) return;
+
+    _heightRange = definition.HeightRange;
+    _diameterRange = definition.DiameterRange;
+
+    _mesh = new CylinderMesh
     {
-        _seed = settings.Seed;
-        _count = settings.Biome.TreesPerChunk;
-        _chunkSize = settings.ChunkSize;
-        _segments = settings.Segments;
-
-        TreeDefinition definition = settings.Biome.Tree;
-        if (_count == 0 || definition == null) return;
-
-        _heightRange = definition.HeightRange;
-        _diameterRange = definition.DiameterRange;
-
-        var material = new StandardMaterial3D
+        Height = 1f,
+        BottomRadius = 0.5f,
+        TopRadius = 0.5f * definition.TopRadiusRatio,
+        RadialSegments = definition.RadialSegments,
+        Rings = 1,
+        Material = new StandardMaterial3D
         {
             AlbedoColor = definition.TrunkColour,
             Roughness = 1f
-        };
-
-        _mesh = new CylinderMesh
-        {
-            Height = 1f,
-            BottomRadius = 0.5f,
-            TopRadius = 0.5f * definition.TopRadiusRatio,
-            RadialSegments = definition.RadialSegments,
-            Rings = 1,
-            Material = material
-        };
-    }
+        }
+    };
+}
     #endregion
 
     #region Chunk Generation

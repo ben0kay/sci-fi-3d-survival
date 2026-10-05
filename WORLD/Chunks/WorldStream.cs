@@ -21,59 +21,76 @@ public partial class WorldStream : Node
     private readonly List<Vector2I> _pending = new();
     private readonly List<Vector2I> _remove = new();
     private TerrainBuilder _terrain;
-    private BiomeDefinition _biome;
+
     private StandardMaterial3D _groundMaterial;
     private Player _player;
     private Task<TerrainBuilder.ChunkData> _buildTask;
     private Vector2I _centre;
     private double _checkTimer;
     private bool _running;
-    private TreeGenerator _trees;
-    private BushGenerator _bushes;
+private BiomeDefinition[] _biomes;
+private BiomeMap _biomeMap;
+private TreeGenerator[] _trees;
+private BushGenerator[] _bushes;
     #endregion
 
     #region Lifecycle
-    // Prepare the assigned biome and safe starting terrain before spawning the player.
-    // =========================================================
-    public override void _Ready()
+// Prepare biome profiles and starting terrain before spawning the player.
+// =========================================================
+public override void _Ready()
+{
+    if (!ValidateConfiguration())
     {
-        if (!ValidateConfiguration())
-        {
-            SetProcess(false);
-            return;
-        }
-
-        _biome = Settings.Biome;
-        AddToGroup(BiomeGroup);
-        _terrain = new TerrainBuilder(Settings);
-        _groundMaterial = new StandardMaterial3D
-        {
-            AlbedoColor = _biome.GroundColour,
-            Roughness = 1f
-        };
-
-        for (int z = -1; z <= 1; z++)
-        for (int x = -1; x <= 1; x++)
-            AttachChunk(_terrain.Build(new Vector2I(x, z)));
-
-        Node instance = PlayerScene.Instantiate();
-        if (instance is not Player player)
-        {
-            instance.Free();
-            RemoveFromGroup(BiomeGroup);
-            GD.PushError("WorldStream: PlayerScene must have a Player root.");
-            SetProcess(false);
-            return;
-        }
-
-        _player = player;
-        _player.Position = new Vector3(0f, _terrain.SampleHeight(0f, 0f) + 2f, 0f);
-        Actors.AddChild(_player);
-
-        _centre = GetPlayerChunk();
-        RefreshRequests();
-        _running = true;
+        SetProcess(false);
+        return;
     }
+
+    int count = Settings.Biomes.Count > 0 ? Settings.Biomes.Count : 1;
+    _biomes = new BiomeDefinition[count];
+    _trees = new TreeGenerator[count];
+    _bushes = new BushGenerator[count];
+    _biomeMap = new BiomeMap(Settings, count);
+
+    for (int i = 0; i < count; i++)
+    {
+        _biomes[i] = Settings.Biomes.Count > 0
+            ? Settings.Biomes[i] : Settings.Biome;
+        _trees[i] = new TreeGenerator(Settings, _biomes[i]);
+        _bushes[i] = new BushGenerator(Settings, _biomes[i]);
+    }
+
+    AddToGroup(BiomeGroup);
+    _terrain = new TerrainBuilder(Settings);
+    _groundMaterial = new StandardMaterial3D
+    {
+        AlbedoColor = Colors.White,
+        VertexColorUseAsAlbedo = true,
+        Roughness = 1f
+    };
+
+    for (int z = -1; z <= 1; z++)
+    for (int x = -1; x <= 1; x++)
+        AttachChunk(_terrain.Build(new Vector2I(x, z)));
+
+    Node instance = PlayerScene.Instantiate();
+    if (instance is not Player player)
+    {
+        instance.Free();
+        RemoveFromGroup(BiomeGroup);
+        GD.PushError("WorldStream: PlayerScene must have a Player root.");
+        SetProcess(false);
+        return;
+    }
+
+    _player = player;
+    _player.Position = new Vector3(
+        0f, _terrain.SampleHeight(0f, 0f) + 2f, 0f);
+    Actors.AddChild(_player);
+
+    _centre = GetPlayerChunk();
+    RefreshRequests();
+    _running = true;
+}
 
     // Check player movement periodically and attach at most one completed chunk per frame.
     // =========================================================
@@ -127,12 +144,12 @@ public partial class WorldStream : Node
     #endregion
 
     #region Biome Queries
-    // Return the assigned test biome; position is reserved for future regional sampling.
-    // =========================================================
-    public BiomeDefinition GetBiomeAt(Vector3 worldPosition)
-    {
-        return _biome;
-    }
+// Report the dominant biome at a world position.
+// =========================================================
+public BiomeDefinition GetBiomeAt(Vector3 worldPosition)
+{
+    return _biomes[_biomeMap.GetIndex(worldPosition.X, worldPosition.Z)];
+}
     #endregion
 
     #region Streaming Requests
@@ -209,7 +226,7 @@ public partial class WorldStream : Node
     #endregion
 
     #region Chunk Attachment
-// Attach terrain, collision, and slope-filtered vegetation on the main thread.
+// Attach blended terrain and vegetation belonging to the chunk's dominant biome.
 // =========================================================
 private void AttachChunk(TerrainBuilder.ChunkData data)
 {
@@ -217,18 +234,19 @@ private void AttachChunk(TerrainBuilder.ChunkData data)
     arrays.Resize((int)Mesh.ArrayType.Max);
     arrays[(int)Mesh.ArrayType.Vertex] = data.Vertices;
     arrays[(int)Mesh.ArrayType.Normal] = data.Normals;
+    arrays[(int)Mesh.ArrayType.Color] = data.Colours;
     arrays[(int)Mesh.ArrayType.Index] = data.Indices;
 
     var mesh = new ArrayMesh();
     mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
     mesh.SurfaceSetMaterial(0, _groundMaterial);
 
+    float originX = data.Coordinate.X * (float)Settings.ChunkSize;
+    float originZ = data.Coordinate.Y * (float)Settings.ChunkSize;
     var chunk = new Node3D
     {
         Name = $"Chunk_{data.Coordinate.X}_{data.Coordinate.Y}",
-        Position = new Vector3(
-            data.Coordinate.X * (float)Settings.ChunkSize, 0f,
-            data.Coordinate.Y * (float)Settings.ChunkSize)
+        Position = new Vector3(originX, 0f, originZ)
     };
 
     chunk.AddChild(new MeshInstance3D
@@ -247,43 +265,65 @@ private void AttachChunk(TerrainBuilder.ChunkData data)
     body.AddChild(new CollisionShape3D { Shape = mesh.CreateTrimeshShape() });
     chunk.AddChild(body);
 
-    _trees ??= new TreeGenerator(Settings);
-    _trees.Attach(chunk, data, _biome.TreeSlopeRange);
+    float halfSize = Settings.ChunkSize * 0.5f;
+    int index = _biomeMap.GetIndex(originX + halfSize, originZ + halfSize);
+    BiomeDefinition biome = _biomes[index];
 
-    _bushes ??= new BushGenerator(Settings);
-    _bushes.Attach(chunk, data, _biome.BushSlopeRange);
+    _trees[index].Attach(chunk, data, biome.TreeSlopeRange);
+    _bushes[index].Attach(chunk, data, biome.BushSlopeRange);
 
     ChunkRoot.AddChild(chunk);
     _chunks.Add(data.Coordinate, chunk);
 }
 
-    // Validate scene references, streaming settings, and the assigned biome.
-    // =========================================================
-    private bool ValidateConfiguration()
+// Validate scene references, biome definitions, and global generation settings.
+// =========================================================
+private bool ValidateConfiguration()
+{
+    if (PlayerScene == null || Actors == null || ChunkRoot == null || Settings == null)
     {
-        if (PlayerScene == null || Actors == null || ChunkRoot == null || Settings == null)
-        {
-            GD.PushError("WorldStream: assign PlayerScene, Actors, ChunkRoot, and Settings.");
-            return false;
-        }
-
-        if (Settings.Biome == null)
-        {
-            GD.PushError("WorldStream: assign a biome in World Settings.");
-            return false;
-        }
-
-        if (!Settings.Biome.Validate()) return false;
-
-        if (Settings.ChunkSize < 8 || Settings.Segments < 4 ||
-            Settings.LoadRadius < 2 || Settings.UnloadRadius <= Settings.LoadRadius ||
-            !float.IsFinite(Settings.CheckInterval) || Settings.CheckInterval <= 0f)
-        {
-            GD.PushError("WorldStream: invalid settings. UnloadRadius must exceed LoadRadius.");
-            return false;
-        }
-
-        return true;
+        GD.PushError("WorldStream: assign PlayerScene, Actors, ChunkRoot, and Settings.");
+        return false;
     }
+
+    if (Settings.Biomes == null ||
+        (Settings.Biomes.Count == 0 && Settings.Biome == null))
+    {
+        GD.PushError("WorldStream: assign at least one biome.");
+        return false;
+    }
+
+    var ids = new HashSet<string>();
+    int count = Settings.Biomes.Count > 0 ? Settings.Biomes.Count : 1;
+    for (int i = 0; i < count; i++)
+    {
+        BiomeDefinition biome = Settings.Biomes.Count > 0
+            ? Settings.Biomes[i] : Settings.Biome;
+
+        if (biome == null || !biome.Validate()) return false;
+        if (!ids.Add(biome.Id))
+        {
+            GD.PushError($"WorldStream: duplicate biome ID '{biome.Id}'.");
+            return false;
+        }
+    }
+
+    float regionSize = Settings.BiomeSize * Settings.BiomeSizeMultiplier;
+    if (!float.IsFinite(Settings.BiomeSize) || Settings.BiomeSize <= 0f ||
+        !float.IsFinite(Settings.BiomeSizeMultiplier) ||
+        Settings.BiomeSizeMultiplier <= 0f ||
+        !float.IsFinite(regionSize) || regionSize < 192f ||
+        Settings.ChunkSize < 8 || Settings.Segments < 4 ||
+        Settings.LoadRadius < 2 || Settings.UnloadRadius <= Settings.LoadRadius ||
+        !float.IsFinite(Settings.CheckInterval) || Settings.CheckInterval <= 0f)
+    {
+        GD.PushError(
+            "WorldStream: invalid settings. Effective biome size must be at least " +
+            "192, and UnloadRadius must exceed LoadRadius.");
+        return false;
+    }
+
+    return true;
+}
     #endregion
 }

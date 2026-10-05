@@ -12,33 +12,35 @@ public sealed class BushGenerator
     #endregion
 
     #region Construction
-    // Copy settings and create one shared placeholder mesh on the main thread.
-    // =========================================================
-    public BushGenerator(WorldSettings settings)
+// Create one shared placeholder bush mesh for the supplied biome.
+// =========================================================
+public BushGenerator(WorldSettings settings, BiomeDefinition biome = null)
+{
+    biome ??= settings.Biome;
+    _seed = settings.Seed;
+    _count = biome.BushesPerChunk;
+    _chunkSize = settings.ChunkSize;
+    _segments = settings.Segments;
+
+    BushDefinition definition = biome.Bush;
+    if (_count == 0 || definition == null) return;
+
+    _heightRange = definition.HeightRange;
+    _widthRange = definition.WidthRange;
+
+    _mesh = new SphereMesh
     {
-        _seed = settings.Seed;
-        _count = settings.Biome.BushesPerChunk;
-        _chunkSize = settings.ChunkSize;
-        _segments = settings.Segments;
-
-        BushDefinition definition = settings.Biome.Bush;
-        if (_count == 0 || definition == null) return;
-
-        _heightRange = definition.HeightRange;
-        _widthRange = definition.WidthRange;
-        _mesh = new SphereMesh
+        Radius = 0.5f,
+        Height = 1f,
+        RadialSegments = 8,
+        Rings = 4,
+        Material = new StandardMaterial3D
         {
-            Radius = 0.5f,
-            Height = 1f,
-            RadialSegments = 8,
-            Rings = 4,
-            Material = new StandardMaterial3D
-            {
-                AlbedoColor = definition.BushColour,
-                Roughness = 1f
-            }
-        };
-    }
+            AlbedoColor = definition.BushColour,
+            Roughness = 1f
+        }
+    };
+}
     #endregion
 
     #region Chunk Generation
