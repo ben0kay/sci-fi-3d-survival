@@ -57,7 +57,7 @@ public partial class AtmosphereEffects : Node3D
         _volume = new FogVolume
         {
             Name = "FogBanks",
-            Shape = FogVolume.ShapeEnum.Box,
+            Shape = RenderingServer.FogVolumeShape.Box,
             Size = new Vector3(192f, 48f, 192f),
             Material = _fogMaterial
         };
