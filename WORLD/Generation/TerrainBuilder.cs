@@ -19,10 +19,12 @@ public int ChunkSize { get; }
 private readonly int _segments, _seed;
 private readonly float _heightAmplitude, _hillSize;
 private readonly float _flatAreaSize, _flatAreaCoverage, _flatTransitionWidth;
+private readonly float _mountainHeight, _mountainSize;
+private readonly float _mountainCoverage, _mountainSharpness;
 #endregion
 
 #region Construction
-// Copy world and biome values before background generation begins.
+// Copy terrain values before background chunk generation begins.
 // =========================================================
 public TerrainBuilder(WorldSettings settings)
 {
@@ -35,31 +37,64 @@ public TerrainBuilder(WorldSettings settings)
     _flatAreaSize = biome.FlatAreaSize;
     _flatAreaCoverage = biome.FlatAreaCoverage;
     _flatTransitionWidth = biome.FlatTransitionWidth;
+    _mountainHeight = biome.MountainHeight;
+    _mountainSize = biome.MountainSize;
+    _mountainCoverage = biome.MountainCoverage;
+    _mountainSharpness = biome.MountainSharpness;
 }
 #endregion
 
 #region Sampling
-// Blend rolling terrain into flat plains using an independent world-space mask.
+// Combine rolling hills and regional mountains while preserving flat plains.
 // =========================================================
 public float SampleHeight(float x, float z)
 {
-    if (_heightAmplitude == 0f || _flatAreaCoverage >= 1f) return 0f;
+    if (_flatAreaCoverage >= 1f) return 0f;
 
-    float hillStrength = SampleHillStrength(x, z);
-    if (hillStrength == 0f) return 0f;
+    float terrainStrength = SampleHillStrength(x, z);
+    if (terrainStrength == 0f) return 0f;
 
-    float broad = Noise(x / _hillSize, z / _hillSize, _seed);
-    float detail = Noise(
-        x / (_hillSize * 0.35f),
-        z / (_hillSize * 0.35f), _seed ^ 7919);
+    float hillHeight = 0f;
+    if (_heightAmplitude > 0f)
+    {
+        float broad = Noise(x / _hillSize, z / _hillSize, _seed);
+        float detail = Noise(
+            x / (_hillSize * 0.35f),
+            z / (_hillSize * 0.35f), _seed ^ 7919);
 
-    float hillHeight = ((broad - 0.5f) + (detail - 0.5f) * 0.25f) *
-                       _heightAmplitude;
+        hillHeight = ((broad - 0.5f) + (detail - 0.5f) * 0.25f) *
+                     _heightAmplitude;
+    }
 
-    return hillHeight * hillStrength;
+    return (hillHeight + SampleMountainHeight(x, z)) * terrainStrength;
 }
 
-// Return zero in plains, one in hills, and a smooth blend between them.
+// Generate broad mountain regions with ridged peaks.
+// =========================================================
+private float SampleMountainHeight(float x, float z)
+{
+    if (_mountainHeight == 0f || _mountainCoverage <= 0f) return 0f;
+
+    float strength = 1f;
+    if (_mountainCoverage < 1f)
+    {
+        float regionSize = _mountainSize * 3f;
+        float region = Noise(x / regionSize, z / regionSize, _seed ^ 65537);
+        float threshold = 1f - _mountainCoverage;
+        float end = MathF.Min(1f, threshold + 0.2f);
+        strength = Smooth(Math.Clamp(
+            (region - threshold) / (end - threshold), 0f, 1f));
+    }
+
+    if (strength == 0f) return 0f;
+
+    float mountain = Noise(x / _mountainSize, z / _mountainSize, _seed ^ 131071);
+    float ridge = 1f - MathF.Abs(mountain * 2f - 1f);
+
+    return MathF.Pow(ridge, _mountainSharpness) * _mountainHeight * strength;
+}
+
+// Blend smoothly from flat plains into unrestricted terrain.
 // =========================================================
 private float SampleHillStrength(float x, float z)
 {
@@ -75,12 +110,10 @@ private float SampleHillStrength(float x, float z)
     return Smooth(blend);
 }
 
-// Sample matching normals across neighbouring chunk borders.
+// Sample consistent lighting normals across chunk borders.
 // =========================================================
 private Vector3 SampleNormal(float x, float z)
 {
-    if (_heightAmplitude == 0f || _flatAreaCoverage >= 1f) return Vector3.Up;
-
     float left = SampleHeight(x - 0.5f, z);
     float right = SampleHeight(x + 0.5f, z);
     float back = SampleHeight(x, z - 0.5f);

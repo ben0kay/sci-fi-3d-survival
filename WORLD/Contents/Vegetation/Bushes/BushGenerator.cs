@@ -1,6 +1,7 @@
 // Creates repeatable, collision-free bush batches owned by terrain chunks.
 using Godot;
 using System;
+using System.Collections.Generic;
 
 public sealed class BushGenerator
 {
@@ -41,44 +42,56 @@ public sealed class BushGenerator
     #endregion
 
     #region Chunk Generation
-    // Scatter one visual bush batch across the chunk without physics bodies.
-    // =========================================================
-    public void Attach(Node3D chunk, TerrainBuilder.ChunkData terrain)
+// Attach slope-filtered bushes without collision or empty batch entries.
+// =========================================================
+public void Attach(
+    Node3D chunk, TerrainBuilder.ChunkData terrain, Vector2 slopeLimits)
+{
+    if (_mesh == null || _count == 0) return;
+
+    var random = new Random(GetChunkSeed(terrain.Coordinate));
+    var transforms = new List<Transform3D>(_count);
+    int columns = (int)Math.Ceiling(Math.Sqrt(_count));
+    float cellSize = (float)_chunkSize / columns;
+
+    for (int i = 0; i < _count; i++)
     {
-        if (_mesh == null || _count == 0) return;
+        float x = (i % columns + Range(random, 0.15f, 0.85f)) * cellSize;
+        float z = (i / columns + Range(random, 0.15f, 0.85f)) * cellSize;
+        float height = Range(random, _heightRange.X, _heightRange.Y);
+        float width = Range(random, _widthRange.X, _widthRange.Y);
+        float placementRoll = (float)random.NextDouble();
 
-        var random = new Random(GetChunkSeed(terrain.Coordinate));
-        var batch = new MultiMesh
-        {
-            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-            Mesh = _mesh,
-            InstanceCount = _count
-        };
+        VegetationPlacement.Sample(terrain, _chunkSize, _segments,
+            x, z, out float groundY, out float slope);
 
-        int columns = (int)Math.Ceiling(Math.Sqrt(_count));
-        float cellSize = (float)_chunkSize / columns;
+        if (placementRoll >= VegetationPlacement.GetChance(slope, slopeLimits))
+            continue;
 
-        for (int i = 0; i < _count; i++)
-        {
-            float x = (i % columns + Range(random, 0.15f, 0.85f)) * cellSize;
-            float z = (i / columns + Range(random, 0.15f, 0.85f)) * cellSize;
-            float height = Range(random, _heightRange.X, _heightRange.Y);
-            float width = Range(random, _widthRange.X, _widthRange.Y);
-            float groundY = SampleGroundHeight(terrain, x, z);
-
-            var scale = new Vector3(width, height, width);
-            var position = new Vector3(x, groundY + height * 0.4f, z);
-            batch.SetInstanceTransform(i,
-                new Transform3D(Basis.Identity.Scaled(scale), position));
-        }
-
-        chunk.AddChild(new MultiMeshInstance3D
-        {
-            Name = "Bushes",
-            Multimesh = batch,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
-        });
+        var scale = new Vector3(width, height, width);
+        var position = new Vector3(x, groundY + height * 0.4f, z);
+        transforms.Add(new Transform3D(Basis.Identity.Scaled(scale), position));
     }
+
+    if (transforms.Count == 0) return;
+
+    var batch = new MultiMesh
+    {
+        TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+        Mesh = _mesh,
+        InstanceCount = transforms.Count
+    };
+
+    for (int i = 0; i < transforms.Count; i++)
+        batch.SetInstanceTransform(i, transforms[i]);
+
+    chunk.AddChild(new MultiMeshInstance3D
+    {
+        Name = "Bushes",
+        Multimesh = batch,
+        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+    });
+}
     #endregion
 
     #region Terrain Sampling

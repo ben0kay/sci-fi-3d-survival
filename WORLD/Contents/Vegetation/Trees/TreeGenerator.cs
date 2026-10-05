@@ -3,6 +3,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
+
 public sealed class TreeGenerator
 {
     #region Configuration
@@ -46,9 +47,10 @@ public sealed class TreeGenerator
     #endregion
 
     #region Chunk Generation
-// Attach batched trunks and simple collision owned by the terrain chunk.
+// Attach slope-filtered trunks and their collision to the owning chunk.
 // =========================================================
-public void Attach(Node3D chunk, TerrainBuilder.ChunkData terrain)
+public void Attach(
+    Node3D chunk, TerrainBuilder.ChunkData terrain, Vector2 slopeLimits)
 {
     if (_mesh == null || _count == 0) return;
 
@@ -72,11 +74,17 @@ public void Attach(Node3D chunk, TerrainBuilder.ChunkData terrain)
         float z = (i / columns + Range(random, 0.2f, 0.8f)) * cellSize;
         float height = Range(random, _heightRange.X, _heightRange.Y);
         float diameter = Range(random, _diameterRange.X, _diameterRange.Y);
+        float placementRoll = (float)random.NextDouble();
 
         float worldX = originX + x, worldZ = originZ + z;
         if (worldX * worldX + worldZ * worldZ < 16f) continue;
 
-        float groundY = SampleGroundHeight(terrain, x, z);
+        VegetationPlacement.Sample(terrain, _chunkSize, _segments,
+            x, z, out float groundY, out float slope);
+
+        if (placementRoll >= VegetationPlacement.GetChance(slope, slopeLimits))
+            continue;
+
         var scale = new Vector3(diameter, height, diameter);
         var position = new Vector3(x, groundY + height * 0.5f - 0.05f, z);
         transforms.Add(new Transform3D(Basis.Identity.Scaled(scale), position));

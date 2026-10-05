@@ -17,6 +17,14 @@ public partial class BiomeDefinition : Resource
     [Export(PropertyHint.Range, "16,512,1")] public float HillSize { get; set; } = 96f;
     #endregion
 
+    #region Mountains
+[ExportGroup("Mountains")]
+[Export(PropertyHint.Range, "0,256,1")] public float MountainHeight { get; set; } = 0f;
+[Export(PropertyHint.Range, "32,512,1")] public float MountainSize { get; set; } = 128f;
+[Export(PropertyHint.Range, "0,1,0.01")] public float MountainCoverage { get; set; } = 0.6f;
+[Export(PropertyHint.Range, "1,4,0.1")] public float MountainSharpness { get; set; } = 2f;
+#endregion
+
     #region Flat Areas
     [ExportGroup("Flat Areas")]
     [Export(PropertyHint.Range, "16,512,1")] public float FlatAreaSize { get; set; } = 128f;
@@ -41,8 +49,14 @@ public partial class BiomeDefinition : Resource
 [Export(PropertyHint.Range, "0,256,1")] public int BushesPerChunk { get; set; } = 0;
 #endregion
 
+#region Vegetation Slopes
+[ExportGroup("Vegetation Slopes")]
+[Export] public Vector2 TreeSlopeRange { get; set; } = new(20f, 40f);
+[Export] public Vector2 BushSlopeRange { get; set; } = new(35f, 60f);
+#endregion
+
     #region Validation
-// Check terrain configuration and enabled vegetation populations.
+// Check terrain settings, vegetation references, and slope limits.
 // =========================================================
 public bool Validate()
 {
@@ -58,9 +72,21 @@ public bool Validate()
         !float.IsFinite(FlatAreaCoverage) ||
         FlatAreaCoverage < 0f || FlatAreaCoverage > 1f ||
         !float.IsFinite(FlatTransitionWidth) ||
-        FlatTransitionWidth <= 0f || FlatTransitionWidth > 1f)
+        FlatTransitionWidth <= 0f || FlatTransitionWidth > 1f ||
+        !float.IsFinite(MountainHeight) || MountainHeight < 0f ||
+        !float.IsFinite(MountainSize) || MountainSize <= 0f ||
+        !float.IsFinite(MountainCoverage) ||
+        MountainCoverage < 0f || MountainCoverage > 1f ||
+        !float.IsFinite(MountainSharpness) ||
+        MountainSharpness < 1f || MountainSharpness > 4f)
     {
         GD.PushError($"BiomeDefinition '{Id}': invalid terrain settings.");
+        return false;
+    }
+
+    if (!ValidSlopeRange(TreeSlopeRange) || !ValidSlopeRange(BushSlopeRange))
+    {
+        GD.PushError($"BiomeDefinition '{Id}': invalid vegetation slope limits.");
         return false;
     }
 
@@ -82,6 +108,14 @@ public bool Validate()
     if (BushesPerChunk > 0 && !Bush.Validate()) return false;
 
     return true;
+}
+
+// Require an unrestricted slope below X and a complete cutoff at Y.
+// =========================================================
+private static bool ValidSlopeRange(Vector2 range)
+{
+    return float.IsFinite(range.X) && float.IsFinite(range.Y) &&
+           range.X >= 0f && range.Y > range.X && range.Y < 90f;
 }
     #endregion
 }

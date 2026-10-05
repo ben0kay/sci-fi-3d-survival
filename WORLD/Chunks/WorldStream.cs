@@ -209,7 +209,7 @@ public partial class WorldStream : Node
     #endregion
 
     #region Chunk Attachment
-// Attach terrain, collision, trees, and bushes on the main thread.
+// Attach terrain, collision, and slope-filtered vegetation on the main thread.
 // =========================================================
 private void AttachChunk(TerrainBuilder.ChunkData data)
 {
@@ -248,10 +248,10 @@ private void AttachChunk(TerrainBuilder.ChunkData data)
     chunk.AddChild(body);
 
     _trees ??= new TreeGenerator(Settings);
-    _trees.Attach(chunk, data);
+    _trees.Attach(chunk, data, _biome.TreeSlopeRange);
 
     _bushes ??= new BushGenerator(Settings);
-    _bushes.Attach(chunk, data);
+    _bushes.Attach(chunk, data, _biome.BushSlopeRange);
 
     ChunkRoot.AddChild(chunk);
     _chunks.Add(data.Coordinate, chunk);
