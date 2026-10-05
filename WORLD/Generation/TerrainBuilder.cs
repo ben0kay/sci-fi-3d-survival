@@ -14,50 +14,81 @@ public sealed class TerrainBuilder
     }
     #endregion
 
-    #region Configuration
-    public int ChunkSize { get; }
-    private readonly int _segments, _seed;
-    private readonly float _heightAmplitude, _hillSize;
-    #endregion
+#region Configuration
+public int ChunkSize { get; }
+private readonly int _segments, _seed;
+private readonly float _heightAmplitude, _hillSize;
+private readonly float _flatAreaSize, _flatAreaCoverage, _flatTransitionWidth;
+#endregion
 
-    #region Construction
-// Copy world and biome settings on the main thread before worker calculations begin.
- // =========================================================
+#region Construction
+// Copy world and biome values before background generation begins.
+// =========================================================
 public TerrainBuilder(WorldSettings settings)
 {
+    BiomeDefinition biome = settings.Biome;
     ChunkSize = settings.ChunkSize;
     _segments = settings.Segments;
     _seed = settings.Seed;
-    _heightAmplitude = settings.Biome.HeightAmplitude;
-    _hillSize = settings.Biome.HillSize;
+    _heightAmplitude = biome.HeightAmplitude;
+    _hillSize = biome.HillSize;
+    _flatAreaSize = biome.FlatAreaSize;
+    _flatAreaCoverage = biome.FlatAreaCoverage;
+    _flatTransitionWidth = biome.FlatTransitionWidth;
 }
-    #endregion
+#endregion
 
-    #region Sampling
-    // Return flat ground or continuous rolling terrain, depending on amplitude.
-    // =========================================================
-    public float SampleHeight(float x, float z)
-    {
-        if (_heightAmplitude == 0f) return 0f;
+#region Sampling
+// Blend rolling terrain into flat plains using an independent world-space mask.
+// =========================================================
+public float SampleHeight(float x, float z)
+{
+    if (_heightAmplitude == 0f || _flatAreaCoverage >= 1f) return 0f;
 
-        float broad = Noise(x / _hillSize, z / _hillSize, _seed);
-        float detail = Noise(x / (_hillSize * 0.35f), z / (_hillSize * 0.35f), _seed ^ 7919);
-        return ((broad - 0.5f) + (detail - 0.5f) * 0.25f) * _heightAmplitude;
-    }
+    float hillStrength = SampleHillStrength(x, z);
+    if (hillStrength == 0f) return 0f;
 
-    // Sample consistent normals across neighbouring chunk borders.
-    // =========================================================
-    private Vector3 SampleNormal(float x, float z)
-    {
-        if (_heightAmplitude == 0f) return Vector3.Up;
+    float broad = Noise(x / _hillSize, z / _hillSize, _seed);
+    float detail = Noise(
+        x / (_hillSize * 0.35f),
+        z / (_hillSize * 0.35f), _seed ^ 7919);
 
-        float left = SampleHeight(x - 0.5f, z);
-        float right = SampleHeight(x + 0.5f, z);
-        float back = SampleHeight(x, z - 0.5f);
-        float front = SampleHeight(x, z + 0.5f);
-        return new Vector3(left - right, 1f, back - front).Normalized();
-    }
-    #endregion
+    float hillHeight = ((broad - 0.5f) + (detail - 0.5f) * 0.25f) *
+                       _heightAmplitude;
+
+    return hillHeight * hillStrength;
+}
+
+// Return zero in plains, one in hills, and a smooth blend between them.
+// =========================================================
+private float SampleHillStrength(float x, float z)
+{
+    if (_flatAreaCoverage <= 0f) return 1f;
+    if (_flatAreaCoverage >= 1f) return 0f;
+
+    float mask = Noise(x / _flatAreaSize, z / _flatAreaSize, _seed ^ 104729);
+    float transitionEnd = MathF.Min(1f, _flatAreaCoverage + _flatTransitionWidth);
+    float blend = Math.Clamp(
+        (mask - _flatAreaCoverage) / (transitionEnd - _flatAreaCoverage),
+        0f, 1f);
+
+    return Smooth(blend);
+}
+
+// Sample matching normals across neighbouring chunk borders.
+// =========================================================
+private Vector3 SampleNormal(float x, float z)
+{
+    if (_heightAmplitude == 0f || _flatAreaCoverage >= 1f) return Vector3.Up;
+
+    float left = SampleHeight(x - 0.5f, z);
+    float right = SampleHeight(x + 0.5f, z);
+    float back = SampleHeight(x, z - 0.5f);
+    float front = SampleHeight(x, z + 0.5f);
+
+    return new Vector3(left - right, 1f, back - front).Normalized();
+}
+#endregion
 
     #region Mesh Generation
     // Generate vertices, normals, and clockwise triangle indices for one chunk.

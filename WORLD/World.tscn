@@ -5,23 +5,25 @@
 [ext_resource type="Script" uid="uid://du3gd7x24s52" path="res://WORLD/Generation/WorldSettings.cs" id="3_settings"]
 [ext_resource type="PackedScene" path="res://ENVIRONMENT/Atmosphere/Fog/Fog.tscn" id="4_fog"]
 [ext_resource type="PackedScene" path="res://ENVIRONMENT/Lighting/Lighting.tscn" id="5_lighting"]
+[ext_resource type="Resource" path="res://WORLD/Biomes/Definitions/TestPlains.tres" id="6_biome"]
 
 [sub_resource type="Resource" id="Settings_world"]
 script = ExtResource("3_settings")
+Biome = ExtResource("6_biome")
 
-[node name="World" type="Node3D" unique_id=519831739]
+[node name="World" type="Node3D" unique_id=1234203064]
 
-[node name="Environment" type="Node" parent="." unique_id=1555920568]
+[node name="Environment" type="Node" parent="." unique_id=1394454346]
 
-[node name="Fog" parent="Environment" unique_id=1227795796 instance=ExtResource("4_fog")]
+[node name="Fog" parent="Environment" unique_id=1655709551 instance=ExtResource("4_fog")]
 
-[node name="Lighting" parent="Environment" unique_id=408708080 instance=ExtResource("5_lighting")]
+[node name="Lighting" parent="Environment" unique_id=880138599 instance=ExtResource("5_lighting")]
 
-[node name="Chunks" type="Node3D" parent="." unique_id=1984006203]
+[node name="Chunks" type="Node3D" parent="." unique_id=549582185]
 
-[node name="Actors" type="Node3D" parent="." unique_id=2039004863]
+[node name="Actors" type="Node3D" parent="." unique_id=1617045981]
 
-[node name="Streaming" type="Node" parent="." unique_id=1830776337 node_paths=PackedStringArray("Actors", "ChunkRoot")]
+[node name="Streaming" type="Node" parent="." unique_id=420359125 node_paths=PackedStringArray("Actors", "ChunkRoot")]
 script = ExtResource("2_stream")
 PlayerScene = ExtResource("1_player")
 Actors = NodePath("../Actors")

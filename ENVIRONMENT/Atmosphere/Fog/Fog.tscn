@@ -25,13 +25,13 @@ fog_enabled = true
 fog_mode = 1
 fog_light_color = Color(0.58, 0.65, 0.66, 1)
 fog_light_energy = 1.0
-fog_sky_affect = 0.0
+fog_sky_affect = 1.0
 fog_depth_begin = 20.0
 fog_depth_end = 72.0
 fog_depth_curve = 1.3
 volumetric_fog_enabled = false
 
-glow_enabled = true
+glow_enabled = false
 glow_intensity = 0.45
 glow_strength = 1.0
 glow_bloom = 0.0

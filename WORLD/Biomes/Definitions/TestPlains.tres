@@ -1,15 +1,14 @@
-[gd_resource type="Resource" script_class="BiomeDefinition" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="BiomeDefinition" format=3 uid="uid://bgmgm4eklfavy"]
 
-[ext_resource type="Script" path="res://WORLD/Biomes/BiomeDefinition.cs" id="1_biome"]
+[ext_resource type="Script" uid="uid://dvkhmhmdplq0o" path="res://WORLD/Biomes/BiomeDefinition.cs" id="1_biome"]
 [ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Trees/Definitions/BasicTrunk.tres" id="2_tree"]
 
 [resource]
 script = ExtResource("1_biome")
 Id = "test_plains"
 DisplayName = "Test Plains"
-Description = "An open biome for testing terrain streaming, tree trunks, and fog."
-HeightAmplitude = 6.0
-HillSize = 96.0
-GroundColour = Color(0.32, 0.38, 0.28, 1)
+Description = "Rolling hills and flat plains for testing terrain, trees, and fog."
+HeightAmplitude = 12.0
+HillSize = 64.0
 Tree = ExtResource("2_tree")
 TreesPerChunk = 16
