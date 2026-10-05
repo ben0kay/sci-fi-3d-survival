@@ -1,9 +1,14 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Shader" path="res://ENVIRONMENT/Sky/NightSky.gdshader" id="1_sky"]
+[ext_resource type="Script" path="res://ENVIRONMENT/Atmosphere/Fog/AtmosphereEffects.cs" id="2_effects"]
+[ext_resource type="Shader" path="res://ENVIRONMENT/Atmosphere/Fog/FogBanks.gdshader" id="3_banks"]
+[ext_resource type="Shader" path="res://ENVIRONMENT/Lighting/LensFlare.gdshader" id="4_flare"]
 
 [sub_resource type="ShaderMaterial" id="SkyMaterial_world"]
 shader = ExtResource("1_sky")
+shader_parameter/moon_brightness = 4.0
+shader_parameter/star_brightness = 0.5
 
 [sub_resource type="Sky" id="Sky_world"]
 sky_material = SubResource("SkyMaterial_world")
@@ -25,8 +30,27 @@ fog_sky_affect = 0.0
 fog_depth_begin = 20.0
 fog_depth_end = 72.0
 fog_depth_curve = 1.3
-volumetric_fog_enabled = false
-glow_enabled = false
+
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.003
+volumetric_fog_albedo = Color(0.55, 0.65, 0.8, 1)
+volumetric_fog_length = 80.0
+volumetric_fog_detail_spread = 2.0
+volumetric_fog_ambient_inject = 0.6
+
+glow_enabled = true
+glow_intensity = 0.3
+glow_strength = 1.0
+glow_bloom = 0.0
+glow_hdr_threshold = 1.2
+glow_hdr_scale = 0.5
 
 [node name="Fog" type="WorldEnvironment"]
 environment = SubResource("Environment_world")
+
+[node name="Effects" type="Node3D" parent="."]
+script = ExtResource("2_effects")
+FogShader = ExtResource("3_banks")
+FlareShader = ExtResource("4_flare")
+BankDensity = 0.065
+FlareStrength = 0.8

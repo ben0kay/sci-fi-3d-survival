@@ -2,9 +2,10 @@
 
 [node name="Lighting" type="Node3D"]
 
-[node name="Moon" type="DirectionalLight3D" parent="."]
+[node name="Moon" type="DirectionalLight3D" parent="." groups=["sky_light"]]
 rotation_degrees = Vector3(-35, -35, 0)
 light_color = Color(0.65, 0.75, 1, 1)
 light_energy = 0.55
 light_angular_distance = 1.2
+light_volumetric_fog_energy = 1.5
 shadow_enabled = false
