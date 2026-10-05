@@ -1,4 +1,4 @@
-// Defines a biome's identity, terrain shape, appearance, and tree population.
+// Defines editable biome terrain, mountain features, vegetation populations, and clustering.
 using Godot;
 
 [Tool, GlobalClass]
@@ -18,12 +18,21 @@ public partial class BiomeDefinition : Resource
     #endregion
 
     #region Mountains
-[ExportGroup("Mountains")]
-[Export(PropertyHint.Range, "0,256,1")] public float MountainHeight { get; set; } = 0f;
-[Export(PropertyHint.Range, "32,512,1")] public float MountainSize { get; set; } = 128f;
-[Export(PropertyHint.Range, "0,1,0.01")] public float MountainCoverage { get; set; } = 0.6f;
-[Export(PropertyHint.Range, "1,4,0.1")] public float MountainSharpness { get; set; } = 2f;
-#endregion
+    [ExportGroup("Mountains")]
+    [Export(PropertyHint.Range, "0,256,1")] public float MountainHeight { get; set; } = 0f;
+    [Export(PropertyHint.Range, "32,512,1")] public float MountainSize { get; set; } = 128f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float MountainCoverage { get; set; } = 0.6f;
+    [Export(PropertyHint.Range, "1,4,0.1")] public float MountainSharpness { get; set; } = 2f;
+    [Export(PropertyHint.Range, "0,32,0.5")] public float MountainDetailHeight { get; set; } = 0f;
+    [Export(PropertyHint.Range, "8,128,1")] public float MountainDetailSize { get; set; } = 32f;
+    #endregion
+
+    #region Plateaus
+    [ExportGroup("Plateaus")]
+    [Export(PropertyHint.Range, "0,128,1")] public float PlateauHeight { get; set; } = 0f;
+    [Export(PropertyHint.Range, "0,0.95,0.01")] public float PlateauThreshold { get; set; } = 0.6f;
+    [Export(PropertyHint.Range, "0.01,0.5,0.01")] public float PlateauTransition { get; set; } = 0.05f;
+    #endregion
 
     #region Flat Areas
     [ExportGroup("Flat Areas")]
@@ -43,79 +52,104 @@ public partial class BiomeDefinition : Resource
     [Export(PropertyHint.Range, "0,256,1")] public int TreesPerChunk { get; set; } = 0;
     #endregion
 
-    #region Bushes
-[ExportGroup("Bushes")]
-[Export] public BushDefinition Bush { get; set; }
-[Export(PropertyHint.Range, "0,256,1")] public int BushesPerChunk { get; set; } = 0;
-#endregion
+    #region Tree Distribution
+    [ExportGroup("Tree Distribution")]
+    [Export(PropertyHint.Range, "8,256,1")] public float TreeClusterSize { get; set; } = 48f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float TreeClusterStrength { get; set; } = 0.8f;
+    [Export(PropertyHint.Range, "0,0.8,0.01")] public float TreePatchThreshold { get; set; } = 0.5f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float IsolatedTreeChance { get; set; } = 0.08f;
+    [Export(PropertyHint.Range, "0.5,8,0.1")] public float TreeMinimumSpacing { get; set; } = 2.5f;
+    #endregion
 
-#region Vegetation Slopes
-[ExportGroup("Vegetation Slopes")]
-[Export] public Vector2 TreeSlopeRange { get; set; } = new(20f, 40f);
-[Export] public Vector2 BushSlopeRange { get; set; } = new(35f, 60f);
-#endregion
+    #region Bushes
+    [ExportGroup("Bushes")]
+    [Export] public BushDefinition Bush { get; set; }
+    [Export(PropertyHint.Range, "0,256,1")] public int BushesPerChunk { get; set; } = 0;
+    #endregion
+
+    #region Vegetation Slopes
+    [ExportGroup("Vegetation Slopes")]
+    [Export] public Vector2 TreeSlopeRange { get; set; } = new(20f, 40f);
+    [Export] public Vector2 BushSlopeRange { get; set; } = new(35f, 60f);
+    #endregion
 
     #region Validation
-// Check terrain settings, vegetation references, and slope limits.
-// =========================================================
-public bool Validate()
-{
-    if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(DisplayName))
+    // Reject invalid terrain, distribution, or vegetation settings with a clear error.
+    // =========================================================
+    public bool Validate()
     {
-        GD.PushError("BiomeDefinition: Id and DisplayName must not be empty.");
+        if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(DisplayName))
+            return Invalid("Id and DisplayName must not be empty.");
+
+        if (!NonNegative(HeightAmplitude) || !Positive(HillSize) ||
+            !Positive(FlatAreaSize) || !UnitRange(FlatAreaCoverage) ||
+            !Positive(FlatTransitionWidth) || FlatTransitionWidth > 1f ||
+            !NonNegative(MountainHeight) || !Positive(MountainSize) ||
+            !UnitRange(MountainCoverage) ||
+            !float.IsFinite(MountainSharpness) ||
+            MountainSharpness < 1f || MountainSharpness > 4f ||
+            !NonNegative(MountainDetailHeight) || !Positive(MountainDetailSize) ||
+            !NonNegative(PlateauHeight) || !UnitRange(PlateauThreshold) ||
+            PlateauThreshold >= 1f || !Positive(PlateauTransition) ||
+            PlateauTransition > 1f)
+            return Invalid("invalid terrain settings.");
+
+        if (!Positive(TreeClusterSize) || !UnitRange(TreeClusterStrength) ||
+            !UnitRange(TreePatchThreshold) || TreePatchThreshold > 0.8f ||
+            !UnitRange(IsolatedTreeChance) || !Positive(TreeMinimumSpacing))
+            return Invalid("invalid tree distribution settings.");
+
+        if (!ValidSlopeRange(TreeSlopeRange) || !ValidSlopeRange(BushSlopeRange))
+            return Invalid("invalid vegetation slope limits.");
+
+        if (TreesPerChunk < 0 || TreesPerChunk > 256 ||
+            (TreesPerChunk > 0 && Tree == null))
+            return Invalid("invalid tree count or missing Tree.");
+
+        if (BushesPerChunk < 0 || BushesPerChunk > 256 ||
+            (BushesPerChunk > 0 && Bush == null))
+            return Invalid("invalid bush count or missing Bush.");
+
+        if (TreesPerChunk > 0 && !Tree.Validate()) return false;
+        if (BushesPerChunk > 0 && !Bush.Validate()) return false;
+        return true;
+    }
+
+    // Report the biome and reason validation failed.
+    // =========================================================
+    private bool Invalid(string reason)
+    {
+        GD.PushError($"BiomeDefinition '{Id}': {reason}");
         return false;
     }
 
-    if (!float.IsFinite(HeightAmplitude) || HeightAmplitude < 0f ||
-        !float.IsFinite(HillSize) || HillSize <= 0f ||
-        !float.IsFinite(FlatAreaSize) || FlatAreaSize <= 0f ||
-        !float.IsFinite(FlatAreaCoverage) ||
-        FlatAreaCoverage < 0f || FlatAreaCoverage > 1f ||
-        !float.IsFinite(FlatTransitionWidth) ||
-        FlatTransitionWidth <= 0f || FlatTransitionWidth > 1f ||
-        !float.IsFinite(MountainHeight) || MountainHeight < 0f ||
-        !float.IsFinite(MountainSize) || MountainSize <= 0f ||
-        !float.IsFinite(MountainCoverage) ||
-        MountainCoverage < 0f || MountainCoverage > 1f ||
-        !float.IsFinite(MountainSharpness) ||
-        MountainSharpness < 1f || MountainSharpness > 4f)
+    // Check a finite positive value.
+    // =========================================================
+    private static bool Positive(float value)
     {
-        GD.PushError($"BiomeDefinition '{Id}': invalid terrain settings.");
-        return false;
+        return float.IsFinite(value) && value > 0f;
     }
 
-    if (!ValidSlopeRange(TreeSlopeRange) || !ValidSlopeRange(BushSlopeRange))
+    // Check a finite non-negative value.
+    // =========================================================
+    private static bool NonNegative(float value)
     {
-        GD.PushError($"BiomeDefinition '{Id}': invalid vegetation slope limits.");
-        return false;
+        return float.IsFinite(value) && value >= 0f;
     }
 
-    if (TreesPerChunk < 0 || TreesPerChunk > 256 ||
-        (TreesPerChunk > 0 && Tree == null))
+    // Check a normalized finite value.
+    // =========================================================
+    private static bool UnitRange(float value)
     {
-        GD.PushError($"BiomeDefinition '{Id}': invalid tree population or missing Tree.");
-        return false;
+        return float.IsFinite(value) && value >= 0f && value <= 1f;
     }
 
-    if (BushesPerChunk < 0 || BushesPerChunk > 256 ||
-        (BushesPerChunk > 0 && Bush == null))
+    // Require full acceptance below X and a complete cutoff at Y.
+    // =========================================================
+    private static bool ValidSlopeRange(Vector2 range)
     {
-        GD.PushError($"BiomeDefinition '{Id}': invalid bush population or missing Bush.");
-        return false;
+        return float.IsFinite(range.X) && float.IsFinite(range.Y) &&
+               range.X >= 0f && range.Y > range.X && range.Y < 90f;
     }
-
-    if (TreesPerChunk > 0 && !Tree.Validate()) return false;
-    if (BushesPerChunk > 0 && !Bush.Validate()) return false;
-
-    return true;
-}
-
-// Require an unrestricted slope below X and a complete cutoff at Y.
-// =========================================================
-private static bool ValidSlopeRange(Vector2 range)
-{
-    return float.IsFinite(range.X) && float.IsFinite(range.Y) &&
-           range.X >= 0f && range.Y > range.X && range.Y < 90f;
-}
     #endregion
 }

@@ -1,5 +1,4 @@
-// Selects repeatable biome regions and blends neighbouring region weights.
-using Godot;
+// Creates irregular biome regions and continuous border weights using warped world-space noise.
 using System;
 
 public sealed class BiomeMap
@@ -10,12 +9,14 @@ public sealed class BiomeMap
         public readonly int A, B, C, D;
         public readonly float X, Z;
 
-        // Store four neighbouring biome indices and their interpolation weights.
+        // Preserve the blend interface used by existing terrain code.
         // =========================================================
-        public Blend(int a, int b, int c, int d, float x, float z)
+        public Blend(int a, int b, float weight)
         {
-            A = a; B = b; C = c; D = d;
-            X = x; Z = z;
+            A = C = a;
+            B = D = b;
+            X = weight;
+            Z = 0f;
         }
     }
     #endregion
@@ -26,7 +27,7 @@ public sealed class BiomeMap
     #endregion
 
     #region Construction
-    // Copy region settings before background terrain generation starts.
+    // Snapshot settings for deterministic sampling on either thread.
     // =========================================================
     public BiomeMap(WorldSettings settings, int count)
     {
@@ -37,55 +38,57 @@ public sealed class BiomeMap
     #endregion
 
     #region Sampling
-    // Blend across broad borders while keeping a pure interior in each region.
+    // Select irregular noise regions and blend near their thresholds.
     // =========================================================
     public Blend Sample(float x, float z)
     {
-        float gridX = x / RegionSize, gridZ = z / RegionSize;
-        int cellX = (int)MathF.Floor(gridX);
-        int cellZ = (int)MathF.Floor(gridZ);
+        if (_count == 1) return new Blend(0, 0, 0f);
 
-        float blendX = Smooth(Math.Clamp((gridX - cellX - 0.1f) / 0.8f, 0f, 1f));
-        float blendZ = Smooth(Math.Clamp((gridZ - cellZ - 0.1f) / 0.8f, 0f, 1f));
+        float nx = x / RegionSize, nz = z / RegionSize;
+        float warpX = WorldNoise.Sample(nx * 0.7f, nz * 0.7f, _seed ^ 65537);
+        float warpZ = WorldNoise.Sample(nx * 0.7f, nz * 0.7f, _seed ^ 131071);
+        nx += (warpX - 0.5f) * 0.85f;
+        nz += (warpZ - 0.5f) * 0.85f;
 
-        return new Blend(
-            Region(cellX, cellZ), Region(cellX + 1, cellZ),
-            Region(cellX, cellZ + 1), Region(cellX + 1, cellZ + 1),
-            blendX, blendZ);
+        float noise = WorldNoise.Fractal(nx, nz, _seed ^ 524287);
+        float value = Math.Clamp((noise - 0.2f) / 0.6f, 0f, 1f) * _count;
+
+        int region = Math.Clamp((int)MathF.Floor(value), 0, _count - 1);
+        const float halfWidth = 0.18f;
+
+        if (region > 0 && value < region + halfWidth)
+        {
+            float weight = WorldNoise.Between(
+                region - halfWidth, region + halfWidth, value);
+            return new Blend(region - 1, region, weight);
+        }
+
+        if (region < _count - 1 && value > region + 1f - halfWidth)
+        {
+            float weight = WorldNoise.Between(
+                region + 1f - halfWidth, region + 1f + halfWidth, value);
+            return new Blend(region, region + 1, weight);
+        }
+
+        return new Blend(region, region, 0f);
     }
 
-    // Return the dominant region for vegetation and the biome HUD.
+    // Report the dominant biome for the map and HUD.
     // =========================================================
     public int GetIndex(float x, float z)
     {
-        int cellX = (int)MathF.Floor(x / RegionSize + 0.5f);
-        int cellZ = (int)MathF.Floor(z / RegionSize + 0.5f);
-        return Region(cellX, cellZ);
+        Blend blend = Sample(x, z);
+        return blend.X < 0.5f ? blend.A : blend.B;
     }
 
-    // Keep three nearby test regions predictable and hash the remaining world.
+    // Return a biome's contribution for gradual vegetation transitions.
     // =========================================================
-    private int Region(int x, int z)
+    public float GetWeight(float x, float z, int index)
     {
-        if (z == 0 && x >= 0 && x < _count) return x;
-
-        unchecked
-        {
-            uint value = (uint)x * 374761393u +
-                         (uint)z * 668265263u +
-                         (uint)_seed * 1442695041u;
-            value = (value ^ (value >> 13)) * 1274126177u;
-            value ^= value >> 16;
-            return (int)(value % (uint)_count);
-        }
-    }
-
-    // Smooth region borders without allocating noise resources.
-    // =========================================================
-    private static float Smooth(float value)
-    {
-        return value * value * value *
-               (value * (value * 6f - 15f) + 10f);
+        Blend blend = Sample(x, z);
+        if (blend.A == blend.B) return index == blend.A ? 1f : 0f;
+        if (index == blend.A) return 1f - blend.X;
+        return index == blend.B ? blend.X : 0f;
     }
     #endregion
 }
