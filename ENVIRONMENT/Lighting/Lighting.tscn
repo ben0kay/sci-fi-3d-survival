@@ -3,7 +3,8 @@
 [node name="Lighting" type="Node3D"]
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-40, -35, 0)
+rotation_degrees = Vector3(-35, -35, 0)
 light_color = Color(1, 0.93, 0.8, 1)
-light_energy = 1.2
+light_energy = 1.5
+light_angular_distance = 0.8
 shadow_enabled = false
