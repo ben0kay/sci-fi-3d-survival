@@ -1,4 +1,4 @@
-// Defines one biome's identity, terrain shape, and ground appearance.
+// Defines a biome's identity, terrain appearance, and tree population.
 using Godot;
 
 [Tool, GlobalClass]
@@ -19,11 +19,17 @@ public partial class BiomeDefinition : Resource
 
     #region Appearance
     [ExportGroup("Appearance")]
-    [Export] public Color GroundColour { get; set; } = new Color(0.32f, 0.38f, 0.28f);
+    [Export] public Color GroundColour { get; set; } = new(0.32f, 0.38f, 0.28f);
+    #endregion
+
+    #region Trees
+    [ExportGroup("Trees")]
+    [Export] public TreeDefinition Tree { get; set; }
+    [Export(PropertyHint.Range, "0,256,1")] public int TreesPerChunk { get; set; } = 0;
     #endregion
 
     #region Validation
-    // Report invalid identity or terrain values before generating the world.
+    // Check terrain configuration and any enabled tree population.
     // =========================================================
     public bool Validate()
     {
@@ -39,6 +45,15 @@ public partial class BiomeDefinition : Resource
             GD.PushError($"BiomeDefinition '{Id}': invalid terrain settings.");
             return false;
         }
+
+        if (TreesPerChunk < 0 || TreesPerChunk > 256 ||
+            (TreesPerChunk > 0 && Tree == null))
+        {
+            GD.PushError($"BiomeDefinition '{Id}': invalid tree population or missing Tree.");
+            return false;
+        }
+
+        if (TreesPerChunk > 0 && !Tree.Validate()) return false;
 
         return true;
     }

@@ -28,6 +28,7 @@ public partial class WorldStream : Node
     private Vector2I _centre;
     private double _checkTimer;
     private bool _running;
+    private TreeGenerator _trees;
     #endregion
 
     #region Lifecycle
@@ -207,47 +208,50 @@ public partial class WorldStream : Node
     #endregion
 
     #region Chunk Attachment
-    // Create the terrain mesh and matching static collision on the main thread.
-    // =========================================================
-    private void AttachChunk(TerrainBuilder.ChunkData data)
+// Attach terrain, matching collision, and the chunk's tree batch on the main thread.
+// =========================================================
+private void AttachChunk(TerrainBuilder.ChunkData data)
+{
+    var arrays = new Godot.Collections.Array();
+    arrays.Resize((int)Mesh.ArrayType.Max);
+    arrays[(int)Mesh.ArrayType.Vertex] = data.Vertices;
+    arrays[(int)Mesh.ArrayType.Normal] = data.Normals;
+    arrays[(int)Mesh.ArrayType.Index] = data.Indices;
+
+    var mesh = new ArrayMesh();
+    mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+    mesh.SurfaceSetMaterial(0, _groundMaterial);
+
+    var chunk = new Node3D
     {
-        var arrays = new Godot.Collections.Array();
-        arrays.Resize((int)Mesh.ArrayType.Max);
-        arrays[(int)Mesh.ArrayType.Vertex] = data.Vertices;
-        arrays[(int)Mesh.ArrayType.Normal] = data.Normals;
-        arrays[(int)Mesh.ArrayType.Index] = data.Indices;
+        Name = $"Chunk_{data.Coordinate.X}_{data.Coordinate.Y}",
+        Position = new Vector3(
+            data.Coordinate.X * (float)Settings.ChunkSize, 0f,
+            data.Coordinate.Y * (float)Settings.ChunkSize)
+    };
 
-        var mesh = new ArrayMesh();
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-        mesh.SurfaceSetMaterial(0, _groundMaterial);
+    chunk.AddChild(new MeshInstance3D
+    {
+        Name = "Terrain",
+        Mesh = mesh,
+        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+    });
 
-        var chunk = new Node3D
-        {
-            Name = $"Chunk_{data.Coordinate.X}_{data.Coordinate.Y}",
-            Position = new Vector3(
-                data.Coordinate.X * (float)Settings.ChunkSize, 0f,
-                data.Coordinate.Y * (float)Settings.ChunkSize)
-        };
+    var body = new StaticBody3D
+    {
+        Name = "Collision",
+        CollisionLayer = 1,
+        CollisionMask = 0
+    };
+    body.AddChild(new CollisionShape3D { Shape = mesh.CreateTrimeshShape() });
+    chunk.AddChild(body);
 
-        chunk.AddChild(new MeshInstance3D
-        {
-            Name = "Terrain",
-            Mesh = mesh,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
-        });
+    _trees ??= new TreeGenerator(Settings);
+    _trees.Attach(chunk, data);
 
-        var body = new StaticBody3D
-        {
-            Name = "Collision",
-            CollisionLayer = 1,
-            CollisionMask = 0
-        };
-        body.AddChild(new CollisionShape3D { Shape = mesh.CreateTrimeshShape() });
-        chunk.AddChild(body);
-
-        ChunkRoot.AddChild(chunk);
-        _chunks.Add(data.Coordinate, chunk);
-    }
+    ChunkRoot.AddChild(chunk);
+    _chunks.Add(data.Coordinate, chunk);
+}
 
     // Validate scene references, streaming settings, and the assigned biome.
     // =========================================================
