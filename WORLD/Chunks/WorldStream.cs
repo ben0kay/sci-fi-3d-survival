@@ -29,6 +29,7 @@ public partial class WorldStream : Node
     private double _checkTimer;
     private bool _running;
     private TreeGenerator _trees;
+    private BushGenerator _bushes;
     #endregion
 
     #region Lifecycle
@@ -208,7 +209,7 @@ public partial class WorldStream : Node
     #endregion
 
     #region Chunk Attachment
-// Attach terrain, matching collision, and the chunk's tree batch on the main thread.
+// Attach terrain, collision, trees, and bushes on the main thread.
 // =========================================================
 private void AttachChunk(TerrainBuilder.ChunkData data)
 {
@@ -248,6 +249,9 @@ private void AttachChunk(TerrainBuilder.ChunkData data)
 
     _trees ??= new TreeGenerator(Settings);
     _trees.Attach(chunk, data);
+
+    _bushes ??= new BushGenerator(Settings);
+    _bushes.Attach(chunk, data);
 
     ChunkRoot.AddChild(chunk);
     _chunks.Add(data.Coordinate, chunk);

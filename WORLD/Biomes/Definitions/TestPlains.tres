@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="BiomeDefinition" format=3 uid="uid://bgmgm4eklfavy"]
+[gd_resource type="Resource" script_class="BiomeDefinition" format=3 uid="uid://dpxe1xiduwu35"]
 
 [ext_resource type="Script" uid="uid://dvkhmhmdplq0o" path="res://WORLD/Biomes/BiomeDefinition.cs" id="1_biome"]
 [ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Trees/Definitions/BasicTrunk.tres" id="2_tree"]
@@ -7,8 +7,9 @@
 script = ExtResource("1_biome")
 Id = "test_plains"
 DisplayName = "Test Plains"
-Description = "Rolling hills and flat plains for testing terrain, trees, and fog."
+Description = "Rolling hills, flat plains, trees, and placeholder bushes."
 HeightAmplitude = 12.0
 HillSize = 64.0
+FlatAreaCoverage = 0.45
 Tree = ExtResource("2_tree")
 TreesPerChunk = 16

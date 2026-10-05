@@ -35,39 +35,53 @@ public partial class BiomeDefinition : Resource
     [Export(PropertyHint.Range, "0,256,1")] public int TreesPerChunk { get; set; } = 0;
     #endregion
 
+    #region Bushes
+[ExportGroup("Bushes")]
+[Export] public BushDefinition Bush { get; set; }
+[Export(PropertyHint.Range, "0,256,1")] public int BushesPerChunk { get; set; } = 0;
+#endregion
+
     #region Validation
-    // Check terrain configuration and any enabled tree population.
-    // =========================================================
-    public bool Validate()
+// Check terrain configuration and enabled vegetation populations.
+// =========================================================
+public bool Validate()
+{
+    if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(DisplayName))
     {
-        if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(DisplayName))
-        {
-            GD.PushError("BiomeDefinition: Id and DisplayName must not be empty.");
-            return false;
-        }
-
-        if (!float.IsFinite(HeightAmplitude) || HeightAmplitude < 0f ||
-            !float.IsFinite(HillSize) || HillSize <= 0f ||
-            !float.IsFinite(FlatAreaSize) || FlatAreaSize <= 0f ||
-            !float.IsFinite(FlatAreaCoverage) ||
-            FlatAreaCoverage < 0f || FlatAreaCoverage > 1f ||
-            !float.IsFinite(FlatTransitionWidth) ||
-            FlatTransitionWidth <= 0f || FlatTransitionWidth > 1f)
-        {
-            GD.PushError($"BiomeDefinition '{Id}': invalid terrain settings.");
-            return false;
-        }
-
-        if (TreesPerChunk < 0 || TreesPerChunk > 256 ||
-            (TreesPerChunk > 0 && Tree == null))
-        {
-            GD.PushError($"BiomeDefinition '{Id}': invalid tree population or missing Tree.");
-            return false;
-        }
-
-        if (TreesPerChunk > 0 && !Tree.Validate()) return false;
-
-        return true;
+        GD.PushError("BiomeDefinition: Id and DisplayName must not be empty.");
+        return false;
     }
+
+    if (!float.IsFinite(HeightAmplitude) || HeightAmplitude < 0f ||
+        !float.IsFinite(HillSize) || HillSize <= 0f ||
+        !float.IsFinite(FlatAreaSize) || FlatAreaSize <= 0f ||
+        !float.IsFinite(FlatAreaCoverage) ||
+        FlatAreaCoverage < 0f || FlatAreaCoverage > 1f ||
+        !float.IsFinite(FlatTransitionWidth) ||
+        FlatTransitionWidth <= 0f || FlatTransitionWidth > 1f)
+    {
+        GD.PushError($"BiomeDefinition '{Id}': invalid terrain settings.");
+        return false;
+    }
+
+    if (TreesPerChunk < 0 || TreesPerChunk > 256 ||
+        (TreesPerChunk > 0 && Tree == null))
+    {
+        GD.PushError($"BiomeDefinition '{Id}': invalid tree population or missing Tree.");
+        return false;
+    }
+
+    if (BushesPerChunk < 0 || BushesPerChunk > 256 ||
+        (BushesPerChunk > 0 && Bush == null))
+    {
+        GD.PushError($"BiomeDefinition '{Id}': invalid bush population or missing Bush.");
+        return false;
+    }
+
+    if (TreesPerChunk > 0 && !Tree.Validate()) return false;
+    if (BushesPerChunk > 0 && !Bush.Validate()) return false;
+
+    return true;
+}
     #endregion
 }

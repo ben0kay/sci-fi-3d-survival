@@ -46,55 +46,77 @@ public sealed class TreeGenerator
     #endregion
 
     #region Chunk Generation
-    // Attach one tree batch which is freed automatically with its owning chunk.
-    // =========================================================
-    public void Attach(Node3D chunk, TerrainBuilder.ChunkData terrain)
+// Attach batched trunks and simple collision owned by the terrain chunk.
+// =========================================================
+public void Attach(Node3D chunk, TerrainBuilder.ChunkData terrain)
+{
+    if (_mesh == null || _count == 0) return;
+
+    var random = new Random(GetChunkSeed(terrain.Coordinate));
+    var transforms = new List<Transform3D>(_count);
+    var collision = new StaticBody3D
     {
-        if (_mesh == null || _count == 0) return;
+        Name = "TreeCollision",
+        CollisionLayer = 1,
+        CollisionMask = 0
+    };
 
-        var random = new Random(GetChunkSeed(terrain.Coordinate));
-        var transforms = new List<Transform3D>(_count);
-        int columns = (int)Math.Ceiling(Math.Sqrt(_count));
-        float cellSize = (float)_chunkSize / columns;
-        float originX = terrain.Coordinate.X * (float)_chunkSize;
-        float originZ = terrain.Coordinate.Y * (float)_chunkSize;
+    int columns = (int)Math.Ceiling(Math.Sqrt(_count));
+    float cellSize = (float)_chunkSize / columns;
+    float originX = terrain.Coordinate.X * (float)_chunkSize;
+    float originZ = terrain.Coordinate.Y * (float)_chunkSize;
 
-        for (int i = 0; i < _count; i++)
+    for (int i = 0; i < _count; i++)
+    {
+        float x = (i % columns + Range(random, 0.2f, 0.8f)) * cellSize;
+        float z = (i / columns + Range(random, 0.2f, 0.8f)) * cellSize;
+        float height = Range(random, _heightRange.X, _heightRange.Y);
+        float diameter = Range(random, _diameterRange.X, _diameterRange.Y);
+
+        float worldX = originX + x, worldZ = originZ + z;
+        if (worldX * worldX + worldZ * worldZ < 16f) continue;
+
+        float groundY = SampleGroundHeight(terrain, x, z);
+        var scale = new Vector3(diameter, height, diameter);
+        var position = new Vector3(x, groundY + height * 0.5f - 0.05f, z);
+        transforms.Add(new Transform3D(Basis.Identity.Scaled(scale), position));
+
+        collision.AddChild(new CollisionShape3D
         {
-            float x = (i % columns + Range(random, 0.2f, 0.8f)) * cellSize;
-            float z = (i / columns + Range(random, 0.2f, 0.8f)) * cellSize;
-            float height = Range(random, _heightRange.X, _heightRange.Y);
-            float diameter = Range(random, _diameterRange.X, _diameterRange.Y);
-
-            // Leave a small clearing around the player's starting position.
-            float worldX = originX + x, worldZ = originZ + z;
-            if (worldX * worldX + worldZ * worldZ < 16f) continue;
-
-            float groundY = SampleGroundHeight(terrain, x, z);
-            var scale = new Vector3(diameter, height, diameter);
-            var position = new Vector3(x, groundY + height * 0.5f - 0.05f, z);
-            transforms.Add(new Transform3D(Basis.Identity.Scaled(scale), position));
-        }
-
-        if (transforms.Count == 0) return;
-
-        var batch = new MultiMesh
-        {
-            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-            Mesh = _mesh,
-            InstanceCount = transforms.Count
-        };
-
-        for (int i = 0; i < transforms.Count; i++)
-            batch.SetInstanceTransform(i, transforms[i]);
-
-        chunk.AddChild(new MultiMeshInstance3D
-        {
-            Name = "Trees",
-            Multimesh = batch,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+            Name = $"Trunk_{i}",
+            Position = position,
+            Shape = new CapsuleShape3D
+            {
+                Radius = MathF.Min(diameter * 0.5f, height * 0.5f),
+                Height = height
+            }
         });
     }
+
+    if (transforms.Count == 0)
+    {
+        collision.Free();
+        return;
+    }
+
+    var batch = new MultiMesh
+    {
+        TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+        Mesh = _mesh,
+        InstanceCount = transforms.Count
+    };
+
+    for (int i = 0; i < transforms.Count; i++)
+        batch.SetInstanceTransform(i, transforms[i]);
+
+    chunk.AddChild(new MultiMeshInstance3D
+    {
+        Name = "Trees",
+        Multimesh = batch,
+        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+    });
+    chunk.AddChild(collision);
+}
     #endregion
 
     #region Terrain Sampling
