@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="BiomeDefinition" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="BiomeDefinition" format=3 uid="uid://kw66kjvr7o50"]
 
-[ext_resource type="Script" path="res://WORLD/Biomes/BiomeDefinition.cs" id="1_biome"]
+[ext_resource type="Script" uid="uid://dvkhmhmdplq0o" path="res://WORLD/Biomes/BiomeDefinition.cs" id="1_biome"]
 [ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Trees/Definitions/BasicTrunk.tres" id="2_tree"]
 [ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Bushes/Definitions/BasicBush.tres" id="3_bush"]
 
@@ -11,18 +11,10 @@ DisplayName = "Test Plains"
 Description = "Mostly flat ground with bushes, occasional groves, and isolated trees."
 HeightAmplitude = 3.0
 HillSize = 128.0
-MountainHeight = 0.0
-FlatAreaSize = 128.0
 FlatAreaCoverage = 0.65
 FlatTransitionWidth = 0.3
-GroundColour = Color(0.32, 0.38, 0.28, 1)
 Tree = ExtResource("2_tree")
 TreesPerChunk = 6
-TreeClusterSize = 48.0
-TreeClusterStrength = 1.0
-TreePatchThreshold = 0.6
-IsolatedTreeChance = 0.035
-TreeMinimumSpacing = 3.0
 Bush = ExtResource("3_bush")
 BushesPerChunk = 12
 TreeSlopeRange = Vector2(15, 30)
