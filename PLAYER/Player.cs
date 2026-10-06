@@ -26,6 +26,7 @@ public partial class Player : CharacterBody3D
 	#region State
 	private Transform3D _spawnTransform;
 	private bool _ready;
+    private PlayerHud _hud;
 	    private WorldBounds _worldBounds;
     private const float WorldEdgeMargin = 0.5f;
 	#endregion
@@ -43,7 +44,8 @@ public partial class Player : CharacterBody3D
 			return;
 		}
 
-		PlayerInput.Initialize();
+		_hud = GetNodeOrNull<PlayerHud>("Hud");
+        PlayerInput.Initialize();
 		_spawnTransform = GlobalTransform;
 		Input.MouseMode = Input.MouseModeEnum.Captured;
 		_ready = true;
@@ -58,7 +60,8 @@ public partial class Player : CharacterBody3D
         float step = (float)delta;
         Vector3 velocity = Velocity;
         bool grounded = IsOnFloor();
-        bool controlsActive = Input.MouseMode == Input.MouseModeEnum.Captured;
+        bool controlsActive = Input.MouseMode == Input.MouseModeEnum.Captured &&
+                              _hud?.IsOpen != true;
         Vector2 movement = controlsActive ? PlayerInput.GetMovement() : Vector2.Zero;
         LiquidBody liquid = LiquidBody.FindAt(this, GlobalPosition);
 
@@ -100,7 +103,7 @@ public partial class Player : CharacterBody3D
 	// =========================================================
 	public override void _UnhandledInput(InputEvent inputEvent)
 	{
-		if (!_ready) return;
+		if (!_ready || _hud?.IsOpen == true) return;
 
 		if (PlayerInput.IsReleaseMouse(inputEvent))
 		{
