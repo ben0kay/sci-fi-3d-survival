@@ -20,6 +20,10 @@ public partial class TreeDefinition : Resource
     [Export] public Color TrunkColour { get; set; } = new(0.24f, 0.16f, 0.1f);
     #endregion
 
+    [ExportGroup("Harvesting")]
+    [Export] public ItemDefinition YieldItem { get; set; }
+    [Export] public Vector2I YieldRange { get; set; } = new(8, 15);
+
     #region Validation
     // Check trunk dimensions before creating shared mesh resources.
     // =========================================================
@@ -35,6 +39,8 @@ public partial class TreeDefinition : Resource
             return false;
         }
 
+        if (YieldRange.X < 1 || YieldRange.Y < YieldRange.X || YieldRange.Y > 999)
+        { GD.PushError("TreeDefinition: invalid yield range."); return false; }
         return true;
     }
 

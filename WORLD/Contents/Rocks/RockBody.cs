@@ -2,7 +2,7 @@
 using Godot;
 using System;
 
-public partial class RockBody : StaticBody3D
+public partial class RockBody : StaticBody3D, IHarvestable
 {
     #region State
     public string StableId { get; private set; }
@@ -29,14 +29,24 @@ public partial class RockBody : StaticBody3D
     }
     #endregion
 
+    public bool CanHarvest => Mineable && RemainingYield > 0;
+
     #region Harvesting
     // Transfer only accepted resources; leave remaining material when the bag is full.
     // =========================================================
     public int TryHarvest(PlayerInventory inventory)
     {
+        return Harvest(inventory, RemainingYield);
+    }
+
+    // Harvest a limited amount for continuous laser extraction.
+    // =========================================================
+    public int Harvest(PlayerInventory inventory, int quantity)
+    {
+        if (quantity < 0) throw new ArgumentOutOfRangeException(nameof(quantity));
         if (inventory == null) throw new ArgumentNullException(nameof(inventory));
         if (!Mineable || RemainingYield == 0) return 0;
-        int accepted = inventory.Add(_yieldItem, RemainingYield);
+        int accepted = inventory.Add(_yieldItem, Math.Min(quantity, RemainingYield));
         RemainingYield -= accepted;
         if (RemainingYield > 0) return accepted;
 

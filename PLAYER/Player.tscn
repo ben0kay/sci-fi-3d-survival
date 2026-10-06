@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://jrtpkspbeqob"]
+[gd_scene load_steps=10 format=3 uid="uid://jrtpkspbeqob"]
 
 [ext_resource type="Script" path="res://PLAYER/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://DEBUG/Hud/DebugHud.cs" id="2_debug"]
@@ -7,6 +7,9 @@
 [ext_resource type="Script" path="res://PLAYER/Inventory/PlayerInventory.cs" id="4_inventory"]
 [ext_resource type="Script" path="res://PLAYER/Inventory/PlayerHotbar.cs" id="5_hotbar"]
 [ext_resource type="Script" path="res://UI/PlayerHud.cs" id="6_hud"]
+
+[ext_resource type="Script" path="res://PLAYER/Equipment/Tools/HarvestLaser/HarvestLaser.cs" id="7_laser"]
+[ext_resource type="Resource" path="res://ITEMS/Tools/HarvestLaser.tres" id="8_laser_item"]
 
 [sub_resource type="CapsuleShape3D" id="Capsule_player"]
 radius = 0.35
@@ -39,6 +42,7 @@ script = ExtResource("3_vitals")
 
 [node name="Inventory" type="Node" parent="Systems"]
 script = ExtResource("4_inventory")
+AddTestItems = false
 
 [node name="Hotbar" type="Node" parent="Systems"]
 script = ExtResource("5_hotbar")
@@ -49,3 +53,14 @@ script = ExtResource("6_hud")
 
 [node name="DebugHud" type="CanvasLayer" parent="."]
 script = ExtResource("2_debug")
+
+[node name="Equipment" type="Node3D" parent="."]
+
+[node name="HarvestLaser" type="Node3D" parent="Equipment" node_paths=PackedStringArray("Camera", "Player", "Inventory", "Hotbar", "Hud")]
+script = ExtResource("7_laser")
+Camera = NodePath("../../Head/Camera3D")
+Player = NodePath("../..")
+Inventory = NodePath("../../Systems/Inventory")
+Hotbar = NodePath("../../Systems/Hotbar")
+Hud = NodePath("../../Hud")
+StarterItem = ExtResource("8_laser_item")

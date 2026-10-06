@@ -10,6 +10,9 @@ public partial class ItemDefinition : Resource
 	[Export(PropertyHint.MultilineText)] public string Description { get; set; } = "";
 	[Export] public Texture2D Icon { get; set; }
 
+    [ExportGroup("Equipment")]
+    [Export] public LaserDefinition Laser { get; set; }
+
 	[ExportGroup("Storage")]
 	[Export(PropertyHint.Range, "1,999,1")]
 	public int MaximumStack { get; set; } = 50;

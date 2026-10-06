@@ -13,6 +13,7 @@ public sealed class TreeGenerator
     private readonly float _isolatedChance, _spacingSquared;
     private readonly BiomeMap _biomeMap;
     private readonly CylinderMesh _mesh;
+    private readonly TreeDefinition _definition;
     #endregion
 
     #region Construction
@@ -43,6 +44,7 @@ public sealed class TreeGenerator
             }
 
         TreeDefinition definition = biome.Tree;
+        _definition = definition;
         if (_count == 0 || definition == null) return;
 
         _heightRange = definition.HeightRange;
@@ -76,11 +78,10 @@ public sealed class TreeGenerator
                 _seed ^ (_biomeIndex * 7919))));
         var transforms = new List<Transform3D>(_count);
         var positions = new List<Vector2>(_count);
-        var collision = new StaticBody3D
+        var bodies = new List<TreeBody>(_count);
+        var collision = new Node3D
         {
-            Name = $"TreeCollision_{_id}",
-            CollisionLayer = 1,
-            CollisionMask = 0
+            Name = $"TreeCollision_{_id}"
         };
 
         float originX = terrain.Coordinate.X * (float)_chunkSize;
@@ -120,7 +121,9 @@ public sealed class TreeGenerator
                 Basis.Identity.Scaled(new Vector3(diameter, height, diameter)),
                 position));
 
-            collision.AddChild(new CollisionShape3D
+            var tree = new TreeBody { Name = $"Tree_{i}" };
+            bodies.Add(tree);
+            tree.AddChild(new CollisionShape3D
             {
                 Name = $"Trunk_{i}",
                 Position = position,
@@ -144,8 +147,15 @@ public sealed class TreeGenerator
             Mesh = _mesh,
             InstanceCount = transforms.Count
         };
+        var yieldRandom = new Random(unchecked(_seed ^ terrain.Coordinate.X * 73856093 ^
+            terrain.Coordinate.Y * 19349663 ^ _biomeIndex));
         for (int i = 0; i < transforms.Count; i++)
+        {
             batch.SetInstanceTransform(i, transforms[i]);
+            bodies[i].Configure(_definition, yieldRandom.Next(
+                _definition.YieldRange.X, _definition.YieldRange.Y + 1), batch, i);
+            collision.AddChild(bodies[i]);
+        }
 
         chunk.AddChild(new MultiMeshInstance3D
         {
