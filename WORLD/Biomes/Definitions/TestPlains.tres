@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://dvkhmhmdplq0o" path="res://WORLD/Biomes/BiomeDefinition.cs" id="1_biome"]
 [ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Trees/Definitions/BasicTrunk.tres" id="2_tree"]
 [ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Bushes/Definitions/BasicBush.tres" id="3_bush"]
-[ext_resource type="Resource" path="res://WORLD/Contents/Rocks/Definitions/SmallStone.tres" id="4_rock"]
+[ext_resource type="Resource" uid="uid://4wxyxxktf3nb" path="res://WORLD/Contents/Rocks/Definitions/SmallStone.tres" id="4_rock"]
 
 [resource]
 script = ExtResource("1_biome")
@@ -19,6 +19,6 @@ TreesPerChunk = 6
 Bush = ExtResource("3_bush")
 BushesPerChunk = 12
 Rock = ExtResource("4_rock")
-RocksPerChunk = 12
+RocksPerChunk = 3
 TreeSlopeRange = Vector2(15, 30)
 BushSlopeRange = Vector2(25, 45)

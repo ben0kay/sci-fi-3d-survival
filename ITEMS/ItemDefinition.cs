@@ -1,7 +1,7 @@
 // Defines reusable inventory items independently of their world representation.
 using Godot;
 
-[GlobalClass]
+[Tool, GlobalClass]
 public partial class ItemDefinition : Resource
 {
 	[ExportGroup("Identity")]
@@ -11,6 +11,9 @@ public partial class ItemDefinition : Resource
 	[Export] public Texture2D Icon { get; set; }
 
 	[ExportGroup("Storage")]
-	[Export(PropertyHint.Range, "1,999,1")] public int MaximumStack { get; set; } = 50;
-	[Export(PropertyHint.Range, "0,100,0.01")] public float WeightKg { get; set; } = 0.1f;
+	[Export(PropertyHint.Range, "1,999,1")]
+	public int MaximumStack { get; set; } = 50;
+
+	[Export(PropertyHint.Range, "0,100,0.01")]
+	public float WeightKg { get; set; } = 0.1f;
 }
