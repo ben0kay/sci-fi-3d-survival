@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://cwbv28u033xs7"]
 
-[ext_resource type="Script" path="res://DEBUG/PlanetPreview/PlanetMapPreview.cs" id="1"]
+[ext_resource type="Script" uid="uid://b2d0rlkeky3uw" path="res://DEBUG/PlanetPreview/PlanetMapPreview.cs" id="1"]
 
-[node name="PlanetMapPreview" type="Control"]
+[node name="PlanetMapPreview" type="Control" unique_id=1107214941]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

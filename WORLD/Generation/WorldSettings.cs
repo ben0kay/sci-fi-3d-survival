@@ -25,4 +25,14 @@ public partial class WorldSettings : Resource
     [Export(PropertyHint.Range, "3,10,1")] public int UnloadRadius { get; set; } = 4;
     [Export(PropertyHint.Range, "0.05,1,0.05")] public float CheckInterval { get; set; } = 0.15f;
     #endregion
+        #region Test Lake
+    [ExportGroup("Test Lake")]
+    [Export] public bool TestLakeEnabled { get; set; } = true;
+    [Export] public Vector2 TestLakeCentre { get; set; } = new(24f, -24f);
+    [Export(PropertyHint.Range, "8,64,1")]
+    public float TestLakeRadius { get; set; } = 16f;
+    [Export(PropertyHint.Range, "2,20,0.5")]
+    public float TestLakeDepth { get; set; } = 5f;
+    [Export] public LiquidDefinition TestLakeLiquid { get; set; }
+    #endregion
 }

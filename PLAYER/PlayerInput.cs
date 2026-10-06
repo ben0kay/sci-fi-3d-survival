@@ -11,21 +11,22 @@ public static class PlayerInput
     private static readonly StringName Jump = "player_jump";
     private static readonly StringName ReleaseMouse = "player_release_mouse";
     private static readonly StringName CaptureMouse = "player_capture_mouse";
+        private static readonly StringName Dive = "player_dive";
     private static bool _initialized;
     #endregion
 
     #region Initialization
-    // Register defaults once, preserving any existing bindings for these actions.
+    // Register movement and swimming defaults without replacing existing bindings.
     // =========================================================
     public static void Initialize()
     {
         if (_initialized) return;
-
         RegisterKey(Forward, Key.Up);
         RegisterKey(Backward, Key.Down);
         RegisterKey(Left, Key.Left);
         RegisterKey(Right, Key.Right);
         RegisterKey(Jump, Key.Space);
+        RegisterKey(Dive, Key.Ctrl);
         RegisterKey(ReleaseMouse, Key.Escape);
         RegisterMouseButton(CaptureMouse, MouseButton.Left);
         _initialized = true;
@@ -77,6 +78,13 @@ public static class PlayerInput
     public static bool IsCaptureMouse(InputEvent inputEvent)
     {
         return inputEvent.IsActionPressed(CaptureMouse);
+    }
+
+        // Hold Space to swim up and Ctrl to dive.
+    // =========================================================
+    public static float GetSwimVertical()
+    {
+        return Input.GetActionStrength(Jump) - Input.GetActionStrength(Dive);
     }
     #endregion
 }

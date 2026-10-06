@@ -47,37 +47,48 @@ public partial class Player : CharacterBody3D
 		_ready = true;
 	}
 
-	// Apply movement, gravity, jumping, and recovery after falling.
-	// =========================================================
-	public override void _PhysicsProcess(double delta)
-	{
-		if (!_ready) return;
+    // Use liquid movement when immersed; otherwise apply normal walking and gravity.
+    // =========================================================
+    public override void _PhysicsProcess(double delta)
+    {
+        if (!_ready) return;
 
-		float step = (float)delta;
-		Vector3 velocity = Velocity;
-		bool grounded = IsOnFloor();
-		bool controlsActive = Input.MouseMode == Input.MouseModeEnum.Captured;
+        float step = (float)delta;
+        Vector3 velocity = Velocity;
+        bool grounded = IsOnFloor();
+        bool controlsActive = Input.MouseMode == Input.MouseModeEnum.Captured;
+        Vector2 movement = controlsActive ? PlayerInput.GetMovement() : Vector2.Zero;
+        LiquidBody liquid = LiquidBody.FindAt(this, GlobalPosition);
 
-		if (!grounded) velocity.Y -= Gravity * step;
-		else if (velocity.Y < 0f) velocity.Y = 0f;
+        bool swimming = PlayerSwimming.Apply(
+            this, liquid, movement, controlsActive, step,
+            ref velocity, out float walkingMultiplier);
 
-		Vector2 movement = controlsActive ? PlayerInput.GetMovement() : Vector2.Zero;
-		if (controlsActive && grounded && PlayerInput.IsJumpPressed())
-			velocity.Y = JumpVelocity;
+        MotionMode = swimming ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
 
-		Vector3 direction = GlobalTransform.Basis * new Vector3(movement.X, 0f, movement.Y);
-		Vector2 targetVelocity = new Vector2(direction.X, direction.Z) * MoveSpeed;
-		float changeRate = movement == Vector2.Zero ? Deceleration : Acceleration;
-		Vector2 horizontalVelocity = new Vector2(velocity.X, velocity.Z);
-		horizontalVelocity = horizontalVelocity.MoveToward(targetVelocity, changeRate * step);
+        if (!swimming)
+        {
+            if (!grounded) velocity.Y -= Gravity * step;
+            else if (velocity.Y < 0f) velocity.Y = 0f;
 
-		velocity.X = horizontalVelocity.X;
-		velocity.Z = horizontalVelocity.Y;
-		Velocity = velocity;
-		MoveAndSlide();
+            if (controlsActive && grounded && PlayerInput.IsJumpPressed())
+                velocity.Y = JumpVelocity;
 
-		if (GlobalPosition.Y < RespawnBelowY) Respawn();
-	}
+            Vector3 direction = GlobalTransform.Basis *
+                                new Vector3(movement.X, 0f, movement.Y);
+            Vector2 target = new Vector2(direction.X, direction.Z) *
+                             MoveSpeed * walkingMultiplier;
+            float rate = movement == Vector2.Zero ? Deceleration : Acceleration;
+            Vector2 horizontal = new Vector2(velocity.X, velocity.Z)
+                .MoveToward(target, rate * step);
+            velocity.X = horizontal.X;
+            velocity.Z = horizontal.Y;
+        }
+
+        Velocity = velocity;
+        MoveAndSlide();
+        if (GlobalPosition.Y < RespawnBelowY) Respawn();
+    }
 	#endregion
 
 	#region Mouse Look

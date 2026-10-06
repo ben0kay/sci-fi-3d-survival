@@ -58,6 +58,7 @@ public partial class WorldStream : Node
         }
 
         _terrain = new TerrainBuilder(Settings);
+                CreateTestLake();
         _groundMaterial = new StandardMaterial3D
         {
             AlbedoColor = Colors.White,
@@ -220,7 +221,7 @@ public partial class WorldStream : Node
     #endregion
 
     #region Chunk Attachment
-    // Attach terrain, collision, blended tree populations, and existing bush batches.
+    // Attach terrain and collision; omit vegetation batches near the test lake.
     // =========================================================
     private void AttachChunk(TerrainBuilder.ChunkData data)
     {
@@ -242,7 +243,6 @@ public partial class WorldStream : Node
             Name = $"Chunk_{data.Coordinate.X}_{data.Coordinate.Y}",
             Position = new Vector3(originX, 0f, originZ)
         };
-
         chunk.AddChild(new MeshInstance3D
         {
             Name = "Terrain",
@@ -252,19 +252,20 @@ public partial class WorldStream : Node
 
         var body = new StaticBody3D
         {
-            Name = "Collision",
-            CollisionLayer = 1,
-            CollisionMask = 0
+            Name = "Collision", CollisionLayer = 1, CollisionMask = 0
         };
         body.AddChild(new CollisionShape3D { Shape = mesh.CreateTrimeshShape() });
         chunk.AddChild(body);
 
-        for (int i = 0; i < _trees.Length; i++)
-            _trees[i].Attach(chunk, data, _biomes[i].TreeSlopeRange);
+        if (!_terrain.IntersectsTestLake(data.Coordinate))
+        {
+            for (int i = 0; i < _trees.Length; i++)
+                _trees[i].Attach(chunk, data, _biomes[i].TreeSlopeRange);
 
-        float halfSize = Settings.ChunkSize * 0.5f;
-        int index = _biomeMap.GetIndex(originX + halfSize, originZ + halfSize);
-        _bushes[index].Attach(chunk, data, _biomes[index].BushSlopeRange);
+            float halfSize = Settings.ChunkSize * 0.5f;
+            int index = _biomeMap.GetIndex(originX + halfSize, originZ + halfSize);
+            _bushes[index].Attach(chunk, data, _biomes[index].BushSlopeRange);
+        }
 
         ChunkRoot.AddChild(chunk);
         _chunks.Add(data.Coordinate, chunk);
@@ -324,4 +325,24 @@ public partial class WorldStream : Node
         return true;
     }
     #endregion
+
+        // Attach the validated test basin's water surface to the world.
+    // =========================================================
+    private void CreateTestLake()
+    {
+        if (!Settings.TestLakeEnabled) return;
+
+        var liquid = new LiquidBody
+        {
+            Name = "TestLake",
+            Position = new Vector3(
+                Settings.TestLakeCentre.X, _terrain.LakeSurfaceY,
+                Settings.TestLakeCentre.Y)
+        };
+        liquid.Configure(
+            Settings.TestLakeLiquid ?? new LiquidDefinition(),
+            Settings.TestLakeRadius, Settings.TestLakeDepth);
+        ChunkRoot.AddChild(liquid);
+        GD.Print($"Test lake: centre {liquid.Position}, depth {Settings.TestLakeDepth} m.");
+    }
 }

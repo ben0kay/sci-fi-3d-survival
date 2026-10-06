@@ -51,10 +51,15 @@ public sealed class TerrainBuilder
     private readonly int _segments, _seed;
     private readonly Profile[] _profiles;
     private readonly BiomeMap _biomeMap;
+        private readonly bool _lakeEnabled;
+    private readonly Vector2 _lakeCentre;
+    private readonly float _lakeRadius, _lakeDepth;
+    public float LakeSurfaceY { get; }
+    
     #endregion
 
     #region Construction
-    // Copy configuration without retaining Resource access in background workers.
+    // Snapshot generation settings and validate the test basin dimensions.
     // =========================================================
     public TerrainBuilder(WorldSettings settings)
     {
@@ -65,24 +70,72 @@ public sealed class TerrainBuilder
         int count = settings.Biomes.Count > 0 ? settings.Biomes.Count : 1;
         _profiles = new Profile[count];
         _biomeMap = new BiomeMap(settings, count);
-
         for (int i = 0; i < count; i++)
             _profiles[i] = new Profile(settings.Biomes.Count > 0
                 ? settings.Biomes[i] : settings.Biome);
+
+        _lakeEnabled = settings.TestLakeEnabled;
+        _lakeCentre = settings.TestLakeCentre;
+        _lakeRadius = settings.TestLakeRadius;
+        _lakeDepth = settings.TestLakeDepth;
+
+        float spacing = (float)ChunkSize / _segments;
+        if (_lakeEnabled &&
+            (!float.IsFinite(_lakeRadius) || _lakeRadius < spacing * 4f ||
+             !float.IsFinite(_lakeDepth) || _lakeDepth < 2f ||
+             !float.IsFinite(_lakeCentre.X) || !float.IsFinite(_lakeCentre.Y)))
+            throw new ArgumentException(
+                "Test lake: radius must cover at least four terrain cells, " +
+                "depth must be at least 2 metres, and centre must be finite.");
+
+        LakeSurfaceY = SampleBaseHeight(_lakeCentre.X, _lakeCentre.Y);
     }
     #endregion
 
     #region Sampling
-    // Blend terrain continuously across irregular biome borders.
+    // Carve a continuous bowl and blend its raised shore into existing terrain.
     // =========================================================
     public float SampleHeight(float x, float z)
+    {
+        float terrain = SampleBaseHeight(x, z);
+        if (!_lakeEnabled) return terrain;
+
+        float distance = new Vector2(x, z).DistanceTo(_lakeCentre);
+        float radius = distance / _lakeRadius;
+        if (radius >= 1.5f) return terrain;
+
+        // The small submerged shore shelf helps cover mesh interpolation at the edge.
+        if (radius <= 1f)
+            return LakeSurfaceY - 0.25f -
+                   _lakeDepth * (1f - radius * radius);
+
+        float blend = WorldNoise.Smooth(
+            Math.Clamp((radius - 1f) / 0.5f, 0f, 1f));
+        return WorldNoise.Lerp(LakeSurfaceY - 0.25f, terrain, blend);
+    }
+
+    // Sample original terrain independently of the lake override.
+    // =========================================================
+    private float SampleBaseHeight(float x, float z)
     {
         BiomeMap.Blend blend = _biomeMap.Sample(x, z);
         float a = SampleProfile(_profiles[blend.A], x, z);
         if (blend.A == blend.B || blend.X <= 0f) return a;
+        return WorldNoise.Lerp(a, SampleProfile(_profiles[blend.B], x, z), blend.X);
+    }
 
-        float b = SampleProfile(_profiles[blend.B], x, z);
-        return WorldNoise.Lerp(a, b, blend.X);
+    // Keep existing vegetation batches away from chunks touched by the test shore.
+    // =========================================================
+    public bool IntersectsTestLake(Vector2I coordinate)
+    {
+        if (!_lakeEnabled) return false;
+        float minX = coordinate.X * (float)ChunkSize;
+        float minZ = coordinate.Y * (float)ChunkSize;
+        Vector2 closest = new(
+            Math.Clamp(_lakeCentre.X, minX, minX + ChunkSize),
+            Math.Clamp(_lakeCentre.Y, minZ, minZ + ChunkSize));
+        return closest.DistanceSquaredTo(_lakeCentre) <
+               _lakeRadius * _lakeRadius * 2.25f;
     }
 
     // Apply one biome's hills, mountain features, and flat-area mask.
