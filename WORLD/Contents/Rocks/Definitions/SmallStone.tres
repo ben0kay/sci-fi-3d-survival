@@ -5,7 +5,7 @@
 
 [resource]
 script = ExtResource("1_rock")
-SizeRange = Vector2(0.45, 1.25)
+SizeRange = Vector2(1.35, 7.5)
 RockColour = Color(0.38, 0.40, 0.43, 1)
 MeshVariants = 4
 Mineable = true
