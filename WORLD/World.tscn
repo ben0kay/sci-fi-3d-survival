@@ -13,6 +13,7 @@
 
 [sub_resource type="Resource" id="Settings_world"]
 script = ExtResource("3_settings")
+RandomizeSeedOnStart = true
 Biome = ExtResource("6_plains")
 Biomes = Array[ExtResource("9_biome_type")]([ExtResource("6_plains"), ExtResource("7_forest"), ExtResource("8_mountains")])
 

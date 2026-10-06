@@ -21,6 +21,7 @@ public partial class WorldSettings : Resource
     #region Generation
     [ExportGroup("Generation")]
     [Export] public int Seed { get; set; } = 12345;
+    [Export] public bool RandomizeSeedOnStart { get; set; } = false;
     [Export(PropertyHint.Range, "8,128,1")] public int ChunkSize { get; set; } = 32;
     [Export(PropertyHint.Range, "4,64,1")] public int Segments { get; set; } = 16;
     #endregion

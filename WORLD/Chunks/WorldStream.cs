@@ -47,15 +47,9 @@ public partial class WorldStream : Node
 
         try
         {
+            PrepareRuntimeSettings();
             _bounds = new WorldBounds(Settings);
-
-            // Include the entire shore transition, not only the visible water.
-            if (Settings.TestLakeEnabled &&
-                !_bounds.ContainsCircle(
-                    Settings.TestLakeCentre, Settings.TestLakeRadius * 1.5f))
-                throw new ArgumentException(
-                    "WorldStream: the complete test lake and shore must fit inside the world.");
-
+            PrepareTestLake();
             _terrain = new TerrainBuilder(Settings);
         }
         catch (ArgumentException error)
@@ -119,9 +113,47 @@ public partial class WorldStream : Node
         _running = true;
 
         GD.Print(
-            $"Finite world: {_bounds.SizeMetres / 1000f:0.###} km per side. " +
+            $"World seed: {Settings.Seed}. Finite world: {_bounds.SizeMetres / 1000f:0.###} km per side. " +
             $"X/Z limits: {-_bounds.HalfSizeMetres} to {_bounds.HalfSizeMetres} m. " +
             $"Chunk limits: {_bounds.MinChunk} to {_bounds.MaxChunk}.");
+    }
+
+    // Copy scene settings so randomization never changes the editor's saved seed.
+    // =========================================================
+    private void PrepareRuntimeSettings()
+    {
+        Settings = (WorldSettings)Settings.Duplicate();
+        if (!Settings.RandomizeSeedOnStart) return;
+        using var random = new RandomNumberGenerator();
+        random.Randomize();
+        Settings.Seed = random.RandiRange(1, int.MaxValue);
+    }
+
+    // Retain the nearby test lake where possible without aborting a small world.
+    // =========================================================
+    private void PrepareTestLake()
+    {
+        if (!Settings.TestLakeEnabled) return;
+        float radius = Settings.TestLakeRadius;
+        if (!float.IsFinite(radius) || radius <= 0f ||
+            !float.IsFinite(Settings.TestLakeDepth) || Settings.TestLakeDepth < 2f ||
+            !float.IsFinite(Settings.TestLakeCentre.X) || !float.IsFinite(Settings.TestLakeCentre.Y))
+            throw new ArgumentException("WorldStream: invalid test lake settings.");
+
+        float shoreRadius = radius * 1.5f;
+        float limit = _bounds.HalfSizeMetres - shoreRadius;
+        if (limit < 0f)
+        {
+            Settings.TestLakeEnabled = false;
+            GD.PushWarning("WorldStream: test lake skipped because its complete basin cannot fit inside this world.");
+            return;
+        }
+
+        Vector2 original = Settings.TestLakeCentre;
+        Settings.TestLakeCentre = new Vector2(
+            Math.Clamp(original.X, -limit, limit), Math.Clamp(original.Y, -limit, limit));
+        if (original != Settings.TestLakeCentre)
+            GD.Print($"Test lake moved inward to {Settings.TestLakeCentre} to keep its shore inside the world.");
     }
 
     // Attach at most one completed chunk per frame and check movement periodically.

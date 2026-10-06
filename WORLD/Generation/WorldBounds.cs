@@ -26,8 +26,11 @@ public sealed class WorldBounds
                 "1000 km; chunk size must be at least 8 metres.");
 
         ChunkSize = settings.ChunkSize;
+        // Round kilometre input to whole metres before aligning it to chunks.
+        // This prevents float rounding from adding a chunk at exact boundaries.
+        double requestedMetres = Math.Round(settings.WorldSizeKm * 1000.0);
         HalfChunkCount = Math.Max(2, (int)Math.Ceiling(
-            settings.WorldSizeKm * 1000.0 / (ChunkSize * 2.0)));
+            requestedMetres / (ChunkSize * 2.0)));
         HalfSizeMetres = HalfChunkCount * (float)ChunkSize;
     }
     #endregion
