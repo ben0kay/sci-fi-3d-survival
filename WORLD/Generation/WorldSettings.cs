@@ -1,9 +1,15 @@
-// Stores global generation, biome-region, and chunk-streaming settings.
+// Stores finite world size, procedural generation, streaming, and test lake settings.
 using Godot;
 
 [GlobalClass]
 public partial class WorldSettings : Resource
 {
+    #region World
+    [ExportGroup("World")]
+    [Export(PropertyHint.Range, "0.128,1000,0.001")]
+    public float WorldSizeKm { get; set; } = 200f;
+    #endregion
+
     #region Biomes
     [ExportGroup("Biomes")]
     [Export] public BiomeDefinition Biome { get; set; }
@@ -25,14 +31,13 @@ public partial class WorldSettings : Resource
     [Export(PropertyHint.Range, "3,10,1")] public int UnloadRadius { get; set; } = 4;
     [Export(PropertyHint.Range, "0.05,1,0.05")] public float CheckInterval { get; set; } = 0.15f;
     #endregion
-        #region Test Lake
+
+    #region Test Lake
     [ExportGroup("Test Lake")]
     [Export] public bool TestLakeEnabled { get; set; } = true;
     [Export] public Vector2 TestLakeCentre { get; set; } = new(24f, -24f);
-    [Export(PropertyHint.Range, "8,64,1")]
-    public float TestLakeRadius { get; set; } = 16f;
-    [Export(PropertyHint.Range, "2,20,0.5")]
-    public float TestLakeDepth { get; set; } = 5f;
+    [Export(PropertyHint.Range, "8,64,1")] public float TestLakeRadius { get; set; } = 16f;
+    [Export(PropertyHint.Range, "2,20,0.5")] public float TestLakeDepth { get; set; } = 5f;
     [Export] public LiquidDefinition TestLakeLiquid { get; set; }
     #endregion
 }

@@ -30,15 +30,36 @@ public partial class WorldStream : Node
     private Vector2I _centre;
     private double _checkTimer;
     private bool _running;
+        private WorldBounds _bounds;
     #endregion
 
     #region Lifecycle
-    // Prepare generation profiles and starting terrain before spawning the player.
+    // Validate finite bounds, build starting chunks, and spawn the bounded player.
     // =========================================================
     public override void _Ready()
     {
         if (!ValidateConfiguration())
         {
+            SetProcess(false);
+            return;
+        }
+
+        try
+        {
+            _bounds = new WorldBounds(Settings);
+
+            // Include the entire shore transition, not only the visible water.
+            if (Settings.TestLakeEnabled &&
+                !_bounds.ContainsCircle(
+                    Settings.TestLakeCentre, Settings.TestLakeRadius * 1.5f))
+                throw new ArgumentException(
+                    "WorldStream: the complete test lake and shore must fit inside the world.");
+
+            _terrain = new TerrainBuilder(Settings);
+        }
+        catch (ArgumentException error)
+        {
+            GD.PushError(error.Message);
             SetProcess(false);
             return;
         }
@@ -57,8 +78,6 @@ public partial class WorldStream : Node
             _bushes[i] = new BushGenerator(Settings, _biomes[i]);
         }
 
-        _terrain = new TerrainBuilder(Settings);
-                CreateTestLake();
         _groundMaterial = new StandardMaterial3D
         {
             AlbedoColor = Colors.White,
@@ -66,9 +85,15 @@ public partial class WorldStream : Node
             Roughness = 1f
         };
 
+        CreateTestLake();
+
         for (int z = -1; z <= 1; z++)
         for (int x = -1; x <= 1; x++)
-            AttachChunk(_terrain.Build(new Vector2I(x, z)));
+        {
+            Vector2I coordinate = new(x, z);
+            if (_bounds.ContainsChunk(coordinate))
+                AttachChunk(_terrain.Build(coordinate));
+        }
 
         Node instance = PlayerScene.Instantiate();
         if (instance is not Player player)
@@ -81,6 +106,7 @@ public partial class WorldStream : Node
 
         AddToGroup(BiomeGroup);
         _player = player;
+        _player.SetWorldBounds(_bounds);
         _player.Position = new Vector3(
             0f, _terrain.SampleHeight(0f, 0f) + 2f, 0f);
         Actors.AddChild(_player);
@@ -88,6 +114,11 @@ public partial class WorldStream : Node
         _centre = GetPlayerChunk();
         RefreshRequests();
         _running = true;
+
+        GD.Print(
+            $"Finite world: {_bounds.SizeMetres / 1000f:0.###} km per side. " +
+            $"X/Z limits: {-_bounds.HalfSizeMetres} to {_bounds.HalfSizeMetres} m. " +
+            $"Chunk limits: {_bounds.MinChunk} to {_bounds.MaxChunk}.");
     }
 
     // Attach at most one completed chunk per frame and check movement periodically.
@@ -149,7 +180,7 @@ public partial class WorldStream : Node
     #endregion
 
     #region Streaming
-    // Queue nearby missing chunks and remove chunks outside the retention radius.
+    // Request only valid nearby chunks and unload distant chunks.
     // =========================================================
     private void RefreshRequests()
     {
@@ -160,11 +191,14 @@ public partial class WorldStream : Node
         for (int x = -radius; x <= radius; x++)
         {
             Vector2I coordinate = _centre + new Vector2I(x, z);
-            if (!_chunks.ContainsKey(coordinate)) _pending.Add(coordinate);
+            if (_bounds.ContainsChunk(coordinate) &&
+                !_chunks.ContainsKey(coordinate))
+                _pending.Add(coordinate);
         }
 
         _pending.Sort((a, b) => DistanceSquared(a).CompareTo(DistanceSquared(b)));
         _remove.Clear();
+
         foreach (var entry in _chunks)
             if (!InsideRadius(entry.Key, Settings.UnloadRadius))
                 _remove.Add(entry.Key);
@@ -203,11 +237,12 @@ public partial class WorldStream : Node
             Mathf.FloorToInt(position.Z / Settings.ChunkSize));
     }
 
-    // Test the existing square chunk-streaming area.
+    // Require both valid world coordinates and proximity to the player.
     // =========================================================
     private bool InsideRadius(Vector2I coordinate, int radius)
     {
-        return Math.Abs(coordinate.X - _centre.X) <= radius &&
+        return _bounds.ContainsChunk(coordinate) &&
+               Math.Abs(coordinate.X - _centre.X) <= radius &&
                Math.Abs(coordinate.Y - _centre.Y) <= radius;
     }
 

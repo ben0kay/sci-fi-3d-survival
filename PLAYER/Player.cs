@@ -26,6 +26,8 @@ public partial class Player : CharacterBody3D
 	#region State
 	private Transform3D _spawnTransform;
 	private bool _ready;
+	    private WorldBounds _worldBounds;
+    private const float WorldEdgeMargin = 0.5f;
 	#endregion
 
 	#region Lifecycle
@@ -47,7 +49,7 @@ public partial class Player : CharacterBody3D
 		_ready = true;
 	}
 
-    // Use liquid movement when immersed; otherwise apply normal walking and gravity.
+    // Apply walking or swimming, then enforce the finite world boundary.
     // =========================================================
     public override void _PhysicsProcess(double delta)
     {
@@ -87,6 +89,8 @@ public partial class Player : CharacterBody3D
 
         Velocity = velocity;
         MoveAndSlide();
+        ApplyWorldBounds();
+
         if (GlobalPosition.Y < RespawnBelowY) Respawn();
     }
 	#endregion
@@ -145,4 +149,29 @@ public partial class Player : CharacterBody3D
 		Velocity = Vector3.Zero;
 	}
 	#endregion
+
+	    // Receive the world's shared limits; standalone sandbox players remain unbounded.
+    // =========================================================
+    public void SetWorldBounds(WorldBounds bounds)
+    {
+        _worldBounds = bounds;
+    }
+
+    // Keep the collider inside the map and remove velocity into the boundary.
+    // =========================================================
+    private void ApplyWorldBounds()
+    {
+        if (_worldBounds == null) return;
+
+        Vector3 position = GlobalPosition;
+        Vector3 clamped = _worldBounds.ClampPosition(position, WorldEdgeMargin);
+        if (position == clamped) return;
+
+        Vector3 velocity = Velocity;
+        if (position.X != clamped.X) velocity.X = 0f;
+        if (position.Z != clamped.Z) velocity.Z = 0f;
+
+        GlobalPosition = clamped;
+        Velocity = velocity;
+    }
 }
