@@ -1,4 +1,4 @@
-// Streams blended terrain and biome vegetation around the player with one background build at a time.
+// Streams blended terrain and biome vegetation and rocks around the player with one background build at a time.
 using Godot;
 using System;
 using System.Collections.Generic;
@@ -27,6 +27,7 @@ public partial class WorldStream : Node
     private BiomeMap _biomeMap;
     private TreeGenerator[] _trees;
     private BushGenerator[] _bushes;
+    private RockGenerator[] _rocks;
     private Vector2I _centre;
     private double _checkTimer;
     private bool _running;
@@ -68,6 +69,7 @@ public partial class WorldStream : Node
         _biomes = new BiomeDefinition[count];
         _trees = new TreeGenerator[count];
         _bushes = new BushGenerator[count];
+        _rocks = new RockGenerator[count];
         _biomeMap = new BiomeMap(Settings, count);
 
         for (int i = 0; i < count; i++)
@@ -76,6 +78,7 @@ public partial class WorldStream : Node
                 ? Settings.Biomes[i] : Settings.Biome;
             _trees[i] = new TreeGenerator(Settings, _biomes[i]);
             _bushes[i] = new BushGenerator(Settings, _biomes[i]);
+            _rocks[i] = new RockGenerator(Settings, _biomes[i], i);
         }
 
         _groundMaterial = new StandardMaterial3D
@@ -302,6 +305,8 @@ public partial class WorldStream : Node
             _bushes[index].Attach(chunk, data, _biomes[index].BushSlopeRange);
         }
 
+        for (int i = 0; i < _rocks.Length; i++) _rocks[i].Attach(chunk, data);
+
         ChunkRoot.AddChild(chunk);
         _chunks.Add(data.Coordinate, chunk);
     }
@@ -335,6 +340,11 @@ public partial class WorldStream : Node
                 return false;
             }
             if (!biome.Validate()) return false;
+            if (biome.RocksPerChunk > 0 && biome.Rock.SizeRange.Y * 1.6f >= Settings.ChunkSize)
+            {
+                GD.PushError($"WorldStream: rocks in '{biome.Id}' must fit within a chunk.");
+                return false;
+            }
             if (!ids.Add(biome.Id))
             {
                 GD.PushError($"WorldStream: duplicate biome ID '{biome.Id}'.");

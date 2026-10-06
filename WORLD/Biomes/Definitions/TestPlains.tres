@@ -4,6 +4,8 @@
 [ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Trees/Definitions/BasicTrunk.tres" id="2_tree"]
 [ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Bushes/Definitions/BasicBush.tres" id="3_bush"]
 
+[ext_resource type="Resource" path="res://WORLD/Contents/Rocks/Definitions/SmallStone.tres" id="4_rock"]
+
 [resource]
 script = ExtResource("1_biome")
 Id = "test_plains"
@@ -19,3 +21,6 @@ Bush = ExtResource("3_bush")
 BushesPerChunk = 12
 TreeSlopeRange = Vector2(15, 30)
 BushSlopeRange = Vector2(25, 45)
+
+Rock = ExtResource("4_rock")
+RocksPerChunk = 12

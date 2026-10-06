@@ -1,4 +1,4 @@
-// Defines editable biome terrain, mountain features, vegetation populations, and clustering.
+// Defines editable biome terrain, mountain features, vegetation, rocks, and distribution.
 using Godot;
 
 [Tool, GlobalClass]
@@ -67,6 +67,17 @@ public partial class BiomeDefinition : Resource
     [Export(PropertyHint.Range, "0,256,1")] public int BushesPerChunk { get; set; } = 0;
     #endregion
 
+    #region Rocks
+    [ExportGroup("Rocks")]
+    [Export] public RockDefinition Rock { get; set; }
+    [Export(PropertyHint.Range, "0,128,1")] public int RocksPerChunk { get; set; } = 0;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float FlatRockChance { get; set; } = 0.45f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float SlopeRockChance { get; set; } = 0.75f;
+    [Export(PropertyHint.Range, "1,55,1")] public float RockPreferredSlope { get; set; } = 30f;
+    [Export] public Vector2 RockSlopeRange { get; set; } = new(55f, 80f);
+    [Export(PropertyHint.Range, "0.5,8,0.1")] public float RockMinimumSpacing { get; set; } = 1.5f;
+    #endregion
+
     #region Vegetation Slopes
     [ExportGroup("Vegetation Slopes")]
     [Export] public Vector2 TreeSlopeRange { get; set; } = new(20f, 40f);
@@ -109,6 +120,14 @@ public partial class BiomeDefinition : Resource
         if (BushesPerChunk < 0 || BushesPerChunk > 256 ||
             (BushesPerChunk > 0 && Bush == null))
             return Invalid("invalid bush count or missing Bush.");
+
+        if (RocksPerChunk < 0 || RocksPerChunk > 128 ||
+            (RocksPerChunk > 0 && Rock == null) || !UnitRange(FlatRockChance) ||
+            !UnitRange(SlopeRockChance) || !Positive(RockPreferredSlope) ||
+            !ValidSlopeRange(RockSlopeRange) || RockPreferredSlope > RockSlopeRange.X ||
+            !Positive(RockMinimumSpacing))
+            return Invalid("invalid rock count, definition, or distribution settings.");
+        if (RocksPerChunk > 0 && !Rock.Validate()) return false;
 
         if (TreesPerChunk > 0 && !Tree.Validate()) return false;
         if (BushesPerChunk > 0 && !Bush.Validate()) return false;
