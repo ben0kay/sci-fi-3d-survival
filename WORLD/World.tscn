@@ -10,6 +10,7 @@
 [ext_resource type="Resource" uid="uid://ckf631ybbpxsf" path="res://WORLD/Biomes/Definitions/RockyMountains.tres" id="8_mountains"]
 [ext_resource type="Script" uid="uid://dvkhmhmdplq0o" path="res://WORLD/Biomes/BiomeDefinition.cs" id="9_biome_type"]
 [ext_resource type="Script" uid="uid://dnt6pqpn5b0u2" path="res://DEBUG/WorldMap/DebugWorldMap.cs" id="10_map"]
+[ext_resource type="Resource" path="res://WORLD/Config/DefaultBiomes.tres" id="10_povum"]
 
 [sub_resource type="Resource" id="Settings_world"]
 script = ExtResource("3_settings")
@@ -34,6 +35,7 @@ PlayerScene = ExtResource("1_player")
 Actors = NodePath("../Actors")
 ChunkRoot = NodePath("../Chunks")
 Settings = SubResource("Settings_world")
+BiomeConfig = ExtResource("10_povum")
 
 [node name="DebugWorldMap" type="CanvasLayer" parent="." unique_id=1655955421 node_paths=PackedStringArray("World")]
 script = ExtResource("10_map")

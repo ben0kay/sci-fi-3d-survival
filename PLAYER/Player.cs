@@ -26,9 +26,9 @@ public partial class Player : CharacterBody3D
 	#region State
 	private Transform3D _spawnTransform;
 	private bool _ready;
-    private PlayerHud _hud;
-	    private WorldBounds _worldBounds;
-    private const float WorldEdgeMargin = 0.5f;
+	private PlayerHud _hud;
+		private WorldBounds _worldBounds;
+	private const float WorldEdgeMargin = 0.5f;
 	#endregion
 
 	#region Lifecycle
@@ -45,57 +45,57 @@ public partial class Player : CharacterBody3D
 		}
 
 		_hud = GetNodeOrNull<PlayerHud>("Hud");
-        PlayerInput.Initialize();
+		PlayerInput.Initialize();
 		_spawnTransform = GlobalTransform;
 		Input.MouseMode = Input.MouseModeEnum.Captured;
 		_ready = true;
 	}
 
-    // Apply walking or swimming, then enforce the finite world boundary.
-    // =========================================================
-    public override void _PhysicsProcess(double delta)
-    {
-        if (!_ready) return;
+	// Apply walking or swimming, then enforce the finite world boundary.
+	// =========================================================
+	public override void _PhysicsProcess(double delta)
+	{
+		if (!_ready) return;
 
-        float step = (float)delta;
-        Vector3 velocity = Velocity;
-        bool grounded = IsOnFloor();
-        bool controlsActive = Input.MouseMode == Input.MouseModeEnum.Captured &&
-                              _hud?.IsOpen != true;
-        Vector2 movement = controlsActive ? PlayerInput.GetMovement() : Vector2.Zero;
-        LiquidBody liquid = LiquidBody.FindAt(this, GlobalPosition);
+		float step = (float)delta;
+		Vector3 velocity = Velocity;
+		bool grounded = IsOnFloor();
+		bool controlsActive = Input.MouseMode == Input.MouseModeEnum.Captured &&
+							  _hud?.IsOpen != true;
+		Vector2 movement = controlsActive ? PlayerInput.GetMovement() : Vector2.Zero;
+		LiquidBody liquid = LiquidBody.FindAt(this, GlobalPosition);
 
-        bool swimming = PlayerSwimming.Apply(
-            this, liquid, movement, controlsActive, step,
-            ref velocity, out float walkingMultiplier);
+		bool swimming = PlayerSwimming.Apply(
+			this, liquid, movement, controlsActive, step,
+			ref velocity, out float walkingMultiplier);
 
-        MotionMode = swimming ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
+		MotionMode = swimming ? MotionModeEnum.Floating : MotionModeEnum.Grounded;
 
-        if (!swimming)
-        {
-            if (!grounded) velocity.Y -= Gravity * step;
-            else if (velocity.Y < 0f) velocity.Y = 0f;
+		if (!swimming)
+		{
+			if (!grounded) velocity.Y -= Gravity * step;
+			else if (velocity.Y < 0f) velocity.Y = 0f;
 
-            if (controlsActive && grounded && PlayerInput.IsJumpPressed())
-                velocity.Y = JumpVelocity;
+			if (controlsActive && grounded && PlayerInput.IsJumpPressed())
+				velocity.Y = JumpVelocity;
 
-            Vector3 direction = GlobalTransform.Basis *
-                                new Vector3(movement.X, 0f, movement.Y);
-            Vector2 target = new Vector2(direction.X, direction.Z) *
-                             MoveSpeed * walkingMultiplier;
-            float rate = movement == Vector2.Zero ? Deceleration : Acceleration;
-            Vector2 horizontal = new Vector2(velocity.X, velocity.Z)
-                .MoveToward(target, rate * step);
-            velocity.X = horizontal.X;
-            velocity.Z = horizontal.Y;
-        }
+			Vector3 direction = GlobalTransform.Basis *
+								new Vector3(movement.X, 0f, movement.Y);
+			Vector2 target = new Vector2(direction.X, direction.Z) *
+							 MoveSpeed * walkingMultiplier;
+			float rate = movement == Vector2.Zero ? Deceleration : Acceleration;
+			Vector2 horizontal = new Vector2(velocity.X, velocity.Z)
+				.MoveToward(target, rate * step);
+			velocity.X = horizontal.X;
+			velocity.Z = horizontal.Y;
+		}
 
-        Velocity = velocity;
-        MoveAndSlide();
-        ApplyWorldBounds();
+		Velocity = velocity;
+		MoveAndSlide();
+		ApplyWorldBounds();
 
-        if (GlobalPosition.Y < RespawnBelowY) Respawn();
-    }
+		if (GlobalPosition.Y < RespawnBelowY) Respawn();
+	}
 	#endregion
 
 	#region Mouse Look
@@ -153,28 +153,28 @@ public partial class Player : CharacterBody3D
 	}
 	#endregion
 
-	    // Receive the world's shared limits; standalone sandbox players remain unbounded.
-    // =========================================================
-    public void SetWorldBounds(WorldBounds bounds)
-    {
-        _worldBounds = bounds;
-    }
+		// Receive the world's shared limits; standalone sandbox players remain unbounded.
+	// =========================================================
+	public void SetWorldBounds(WorldBounds bounds)
+	{
+		_worldBounds = bounds;
+	}
 
-    // Keep the collider inside the map and remove velocity into the boundary.
-    // =========================================================
-    private void ApplyWorldBounds()
-    {
-        if (_worldBounds == null) return;
+	// Keep the collider inside the map and remove velocity into the boundary.
+	// =========================================================
+	private void ApplyWorldBounds()
+	{
+		if (_worldBounds == null) return;
 
-        Vector3 position = GlobalPosition;
-        Vector3 clamped = _worldBounds.ClampPosition(position, WorldEdgeMargin);
-        if (position == clamped) return;
+		Vector3 position = GlobalPosition;
+		Vector3 clamped = _worldBounds.ClampPosition(position, WorldEdgeMargin);
+		if (position == clamped) return;
 
-        Vector3 velocity = Velocity;
-        if (position.X != clamped.X) velocity.X = 0f;
-        if (position.Z != clamped.Z) velocity.Z = 0f;
+		Vector3 velocity = Velocity;
+		if (position.X != clamped.X) velocity.X = 0f;
+		if (position.Z != clamped.Z) velocity.Z = 0f;
 
-        GlobalPosition = clamped;
-        Velocity = velocity;
-    }
+		GlobalPosition = clamped;
+		Velocity = velocity;
+	}
 }

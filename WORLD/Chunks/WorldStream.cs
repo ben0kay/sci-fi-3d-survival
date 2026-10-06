@@ -12,6 +12,9 @@ public partial class WorldStream : Node
     [Export] public Node3D Actors { get; set; }
     [Export] public Node3D ChunkRoot { get; set; }
     [Export] public WorldSettings Settings { get; set; }
+
+    [ExportGroup("World Configuration")]
+    [Export] public WorldBiomeConfig BiomeConfig { get; set; }
     #endregion
 
     #region State
@@ -35,12 +38,15 @@ public partial class WorldStream : Node
     #endregion
 
     #region Lifecycle
-    // Validate finite bounds, build starting chunks, and spawn the bounded player.
+    // Resolve enabled biomes, generate starting chunks, and spawn the player.
     // =========================================================
     public override void _Ready()
     {
-        if (!ValidateConfiguration())
+        if (PlayerScene == null || Actors == null ||
+            ChunkRoot == null || Settings == null)
         {
+            GD.PushError(
+                "WorldStream: assign PlayerScene, Actors, ChunkRoot, and Settings.");
             SetProcess(false);
             return;
         }
@@ -48,6 +54,19 @@ public partial class WorldStream : Node
         try
         {
             PrepareRuntimeSettings();
+
+            if (BiomeConfig != null && !BiomeConfig.ApplyTo(Settings))
+            {
+                SetProcess(false);
+                return;
+            }
+
+            if (!ValidateConfiguration())
+            {
+                SetProcess(false);
+                return;
+            }
+
             _bounds = new WorldBounds(Settings);
             PrepareTestLake();
             _terrain = new TerrainBuilder(Settings);
@@ -113,7 +132,8 @@ public partial class WorldStream : Node
         _running = true;
 
         GD.Print(
-            $"World seed: {Settings.Seed}. Finite world: {_bounds.SizeMetres / 1000f:0.###} km per side. " +
+            $"World seed: {Settings.Seed}. " +
+            $"Finite world: {_bounds.SizeMetres / 1000f:0.###} km per side. " +
             $"X/Z limits: {-_bounds.HalfSizeMetres} to {_bounds.HalfSizeMetres} m. " +
             $"Chunk limits: {_bounds.MinChunk} to {_bounds.MaxChunk}.");
     }
