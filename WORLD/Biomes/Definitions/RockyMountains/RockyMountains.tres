@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="RockyMountainsDefinition" format=3 uid="uid://ckf631ybbpxsf"]
+
+[ext_resource type="Script" uid="uid://bmp65v6jp0ix2" path="res://WORLD/Biomes/Definitions/RockyMountains/RockyMountainsDefinition.cs" id="1_biome"]
+[ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Trees/Definitions/BasicTrunk.tres" id="2_tree"]
+[ext_resource type="Resource" path="res://WORLD/Contents/Vegetation/Bushes/Definitions/BasicBush.tres" id="3_bush"]
+[ext_resource type="Resource" uid="uid://4wxyxxktf3nb" path="res://WORLD/Contents/Rocks/Definitions/SmallStone.tres" id="4_rock"]
+
+[resource]
+script = ExtResource("1_biome")
+Id = "rocky_mountains"
+DisplayName = "Rocky Mountains"
+Description = "Elevated alien mountain ranges with connected ridges and rugged rocky valleys."
+HeightAmplitude = 8.0
+MountainHeight = 180.0
+MountainCoverage = 1.0
+MountainSharpness = 1.4
+MountainDetailHeight = 18.0
+MountainDetailSize = 40.0
+GroundColour = Color(0.38, 0.25, 0.2, 1)
+Tree = ExtResource("2_tree")
+TreesPerChunk = 2
+Bush = ExtResource("3_bush")
+BushesPerChunk = 2
+Rock = ExtResource("4_rock")
+RocksPerChunk = 6
+FlatRockChance = 0.35
+RockMinimumSpacing = 2.5
+TreeSlopeRange = Vector2(12, 28)
+BushSlopeRange = Vector2(22, 42)

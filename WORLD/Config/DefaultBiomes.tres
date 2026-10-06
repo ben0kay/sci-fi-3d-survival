@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://r7j7u8a8e740" path="res://WORLD/Config/BiomeEntry.cs" id="2_entry"]
 [ext_resource type="Resource" uid="uid://kw66kjvr7o50" path="res://WORLD/Biomes/Definitions/TestPlains.tres" id="3_plains"]
 [ext_resource type="Resource" uid="uid://cg4r1atywpxov" path="res://WORLD/Biomes/Definitions/RollingHillForest.tres" id="4_forest"]
-[ext_resource type="Resource" uid="uid://ckf631ybbpxsf" path="res://WORLD/Biomes/Definitions/RockyMountains.tres" id="5_mountains"]
+[ext_resource type="Resource" uid="uid://ckf631ybbpxsf" path="res://WORLD/Biomes/Definitions/RockyMountains/RockyMountains.tres" id="5_mountains"]
 
 [sub_resource type="Resource" id="Entry_plains"]
 script = ExtResource("2_entry")

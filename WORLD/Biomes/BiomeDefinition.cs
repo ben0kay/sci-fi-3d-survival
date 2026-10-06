@@ -171,4 +171,13 @@ public partial class BiomeDefinition : Resource
                range.X >= 0f && range.Y > range.X && range.Y < 90f;
     }
     #endregion
+
+        #region Terrain Factory
+    // Use default terrain unless a biome-specific definition overrides this method.
+    // =========================================================
+    public virtual BiomeTerrainSampler CreateTerrain(int seed)
+    {
+        return new BiomeTerrainSampler(this, seed);
+    }
+    #endregion
 }

@@ -1,4 +1,4 @@
-// Generates blended terrain with rolling hills, sharp ridges, crags, and plateau ledges.
+// Blends biome terrain samplers, carves the test basin, and builds shared chunk meshes.
 using Godot;
 using System;
 
@@ -13,66 +13,40 @@ public sealed class TerrainBuilder
         public int[] Indices;
         public Color[] Colours;
     }
-
-    private readonly struct Profile
-    {
-        public readonly float HillHeight, HillSize;
-        public readonly float FlatSize, FlatCoverage, FlatTransition;
-        public readonly float MountainHeight, MountainSize, MountainCoverage, Sharpness;
-        public readonly float DetailHeight, DetailSize;
-        public readonly float PlateauHeight, PlateauThreshold, PlateauTransition;
-        public readonly Color Colour;
-
-        // Snapshot a biome's terrain values before background generation.
-        // =========================================================
-        public Profile(BiomeDefinition biome)
-        {
-            HillHeight = biome.HeightAmplitude;
-            HillSize = biome.HillSize;
-            FlatSize = biome.FlatAreaSize;
-            FlatCoverage = biome.FlatAreaCoverage;
-            FlatTransition = biome.FlatTransitionWidth;
-            MountainHeight = biome.MountainHeight;
-            MountainSize = biome.MountainSize;
-            MountainCoverage = biome.MountainCoverage;
-            Sharpness = biome.MountainSharpness;
-            DetailHeight = biome.MountainDetailHeight;
-            DetailSize = biome.MountainDetailSize;
-            PlateauHeight = biome.PlateauHeight;
-            PlateauThreshold = biome.PlateauThreshold;
-            PlateauTransition = biome.PlateauTransition;
-            Colour = biome.GroundColour;
-        }
-    }
     #endregion
 
     #region Configuration
     public int ChunkSize { get; }
-    private readonly int _segments, _seed;
-    private readonly Profile[] _profiles;
+    private readonly int _segments;
+    private readonly BiomeTerrainSampler[] _terrain;
+    private readonly Color[] _colours;
     private readonly BiomeMap _biomeMap;
-        private readonly bool _lakeEnabled;
+    private readonly bool _lakeEnabled;
     private readonly Vector2 _lakeCentre;
     private readonly float _lakeRadius, _lakeDepth;
     public float LakeSurfaceY { get; }
-    
     #endregion
 
     #region Construction
-    // Snapshot generation settings and validate the test basin dimensions.
+    // Create biome samplers and snapshot settings before background generation.
     // =========================================================
     public TerrainBuilder(WorldSettings settings)
     {
         ChunkSize = settings.ChunkSize;
         _segments = settings.Segments;
-        _seed = settings.Seed;
 
         int count = settings.Biomes.Count > 0 ? settings.Biomes.Count : 1;
-        _profiles = new Profile[count];
+        _terrain = new BiomeTerrainSampler[count];
+        _colours = new Color[count];
         _biomeMap = new BiomeMap(settings, count);
+
         for (int i = 0; i < count; i++)
-            _profiles[i] = new Profile(settings.Biomes.Count > 0
-                ? settings.Biomes[i] : settings.Biome);
+        {
+            BiomeDefinition biome = settings.Biomes.Count > 0
+                ? settings.Biomes[i] : settings.Biome;
+            _terrain[i] = biome.CreateTerrain(settings.Seed);
+            _colours[i] = biome.GroundColour;
+        }
 
         _lakeEnabled = settings.TestLakeEnabled;
         _lakeCentre = settings.TestLakeCentre;
@@ -93,7 +67,7 @@ public sealed class TerrainBuilder
     #endregion
 
     #region Sampling
-    // Carve a continuous bowl and blend its raised shore into existing terrain.
+    // Carve a continuous bowl and blend its shore into the surrounding terrain.
     // =========================================================
     public float SampleHeight(float x, float z)
     {
@@ -104,7 +78,6 @@ public sealed class TerrainBuilder
         float radius = distance / _lakeRadius;
         if (radius >= 1.5f) return terrain;
 
-        // The small submerged shore shelf helps cover mesh interpolation at the edge.
         if (radius <= 1f)
             return LakeSurfaceY - 0.25f -
                    _lakeDepth * (1f - radius * radius);
@@ -114,132 +87,43 @@ public sealed class TerrainBuilder
         return WorldNoise.Lerp(LakeSurfaceY - 0.25f, terrain, blend);
     }
 
-    // Sample original terrain independently of the lake override.
+    // Blend the heights supplied by the relevant biome terrain generators.
     // =========================================================
     private float SampleBaseHeight(float x, float z)
     {
         BiomeMap.Blend blend = _biomeMap.Sample(x, z);
-        float a = SampleProfile(_profiles[blend.A], x, z);
+        float a = _terrain[blend.A].SampleHeight(x, z);
         if (blend.A == blend.B || blend.X <= 0f) return a;
-        return WorldNoise.Lerp(a, SampleProfile(_profiles[blend.B], x, z), blend.X);
+
+        return WorldNoise.Lerp(
+            a, _terrain[blend.B].SampleHeight(x, z), blend.X);
     }
 
-    // Keep existing vegetation batches away from chunks touched by the test shore.
+    // Keep vegetation batches away from chunks touched by the test shore.
     // =========================================================
     public bool IntersectsTestLake(Vector2I coordinate)
     {
         if (!_lakeEnabled) return false;
+
         float minX = coordinate.X * (float)ChunkSize;
         float minZ = coordinate.Y * (float)ChunkSize;
         Vector2 closest = new(
             Math.Clamp(_lakeCentre.X, minX, minX + ChunkSize),
             Math.Clamp(_lakeCentre.Y, minZ, minZ + ChunkSize));
+
         return closest.DistanceSquaredTo(_lakeCentre) <
                _lakeRadius * _lakeRadius * 2.25f;
     }
 
-    // Apply one biome's hills, mountain features, and flat-area mask.
-    // =========================================================
-    private float SampleProfile(Profile profile, float x, float z)
-    {
-        if (profile.FlatCoverage >= 1f) return 0f;
-
-        float strength = 1f;
-        if (profile.FlatCoverage > 0f)
-        {
-            float mask = WorldNoise.Sample(
-                x / profile.FlatSize, z / profile.FlatSize, _seed ^ 104729);
-            strength = WorldNoise.Between(
-                profile.FlatCoverage,
-                MathF.Min(1f, profile.FlatCoverage + profile.FlatTransition), mask);
-        }
-
-        if (strength <= 0f) return 0f;
-
-        float hills = 0f;
-        if (profile.HillHeight > 0f)
-        {
-            float broad = WorldNoise.Sample(
-                x / profile.HillSize, z / profile.HillSize, _seed);
-            float detail = WorldNoise.Sample(
-                x / (profile.HillSize * 0.35f),
-                z / (profile.HillSize * 0.35f), _seed ^ 7919);
-            hills = ((broad - 0.5f) + (detail - 0.5f) * 0.25f) *
-                    profile.HillHeight;
-        }
-
-        return (hills + SampleMountains(profile, x, z)) * strength;
-    }
-
-    // Combine large ridges, smaller crags, plateau shelves, and lower valley areas.
-    // =========================================================
-    private float SampleMountains(Profile profile, float x, float z)
-    {
-        if (profile.MountainHeight <= 0f || profile.MountainCoverage <= 0f)
-            return 0f;
-
-        float nx = x / profile.MountainSize, nz = z / profile.MountainSize;
-        float coverage = 1f;
-        if (profile.MountainCoverage < 1f)
-        {
-            float region = WorldNoise.Sample(nx / 3f, nz / 3f, _seed ^ 65537);
-            float start = 1f - profile.MountainCoverage;
-            coverage = WorldNoise.Between(start, MathF.Min(1f, start + 0.2f), region);
-        }
-
-        if (coverage <= 0f) return 0f;
-
-        float warpX = WorldNoise.Sample(nx * 0.6f, nz * 0.6f, _seed ^ 8191);
-        float warpZ = WorldNoise.Sample(nx * 0.6f, nz * 0.6f, _seed ^ 32749);
-        nx += (warpX - 0.5f) * 0.7f;
-        nz += (warpZ - 0.5f) * 0.7f;
-
-        float ridge = WorldNoise.Ridge(nx, nz, _seed ^ 131071);
-        float secondary = WorldNoise.Ridge(
-            nx * 2.1f + 13f, nz * 2.1f - 7f, _seed ^ 262147);
-        float mountain = MathF.Pow(ridge, profile.Sharpness) *
-                         profile.MountainHeight;
-        mountain *= 0.7f + secondary * 0.3f;
-
-        float valley = WorldNoise.Sample(nx * 0.7f, nz * 0.7f, _seed ^ 524287);
-        float valleyStrength = WorldNoise.Lerp(
-            0.15f, 1f, WorldNoise.Between(0.25f, 0.55f, valley));
-        mountain *= valleyStrength;
-
-        float plateau = 0f;
-        if (profile.PlateauHeight > 0f)
-        {
-            float mask = WorldNoise.Sample(nx * 1.3f, nz * 1.3f, _seed ^ 99991);
-            plateau = WorldNoise.Between(
-                profile.PlateauThreshold,
-                MathF.Min(1f, profile.PlateauThreshold + profile.PlateauTransition),
-                mask);
-        }
-
-        float crags = 0f;
-        if (profile.DetailHeight > 0f)
-        {
-            float detail = WorldNoise.Ridge(
-                x / profile.DetailSize, z / profile.DetailSize, _seed ^ 15485863);
-            crags = MathF.Pow(detail, 2f) * profile.DetailHeight *
-                    (0.25f + 0.75f * ridge) * valleyStrength;
-        }
-
-        float plateauSurface = profile.PlateauHeight + mountain * 0.12f;
-        return (WorldNoise.Lerp(mountain + crags, plateauSurface, plateau)) *
-               coverage;
-    }
-
-    // Blend ground colour using the same region weights as terrain height.
+    // Blend ground colours with the same weights used for terrain height.
     // =========================================================
     private Color SampleColour(float x, float z)
     {
         BiomeMap.Blend blend = _biomeMap.Sample(x, z);
-        return _profiles[blend.A].Colour.Lerp(
-            _profiles[blend.B].Colour, blend.X);
+        return _colours[blend.A].Lerp(_colours[blend.B], blend.X);
     }
 
-    // Calculate lighting normals consistently on both sides of chunk boundaries.
+    // Calculate matching lighting normals on either side of chunk boundaries.
     // =========================================================
     private Vector3 SampleNormal(float x, float z)
     {
@@ -251,7 +135,7 @@ public sealed class TerrainBuilder
     #endregion
 
     #region Mesh Generation
-    // Generate the existing chunk mesh resolution with continuous world-space samples.
+    // Build a chunk from continuous world-space height and colour samples.
     // =========================================================
     public ChunkData Build(Vector2I coordinate)
     {
@@ -275,6 +159,7 @@ public sealed class TerrainBuilder
             int index = z * stride + x;
             float localX = x * spacing, localZ = z * spacing;
             float worldX = originX + localX, worldZ = originZ + localZ;
+
             data.Vertices[index] = new Vector3(
                 localX, SampleHeight(worldX, worldZ), localZ);
             data.Normals[index] = SampleNormal(worldX, worldZ);

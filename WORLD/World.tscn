@@ -7,10 +7,10 @@
 [ext_resource type="PackedScene" path="res://ENVIRONMENT/Lighting/Lighting.tscn" id="5_lighting"]
 [ext_resource type="Resource" uid="uid://kw66kjvr7o50" path="res://WORLD/Biomes/Definitions/TestPlains.tres" id="6_plains"]
 [ext_resource type="Resource" uid="uid://cg4r1atywpxov" path="res://WORLD/Biomes/Definitions/RollingHillForest.tres" id="7_forest"]
-[ext_resource type="Resource" uid="uid://ckf631ybbpxsf" path="res://WORLD/Biomes/Definitions/RockyMountains.tres" id="8_mountains"]
+[ext_resource type="Resource" uid="uid://ckf631ybbpxsf" path="res://WORLD/Biomes/Definitions/RockyMountains/RockyMountains.tres" id="8_mountains"]
 [ext_resource type="Script" uid="uid://dvkhmhmdplq0o" path="res://WORLD/Biomes/BiomeDefinition.cs" id="9_biome_type"]
 [ext_resource type="Script" uid="uid://dnt6pqpn5b0u2" path="res://DEBUG/WorldMap/DebugWorldMap.cs" id="10_map"]
-[ext_resource type="Resource" path="res://WORLD/Config/DefaultBiomes.tres" id="10_povum"]
+[ext_resource type="Resource" uid="uid://yfutihv6uicv" path="res://WORLD/Config/DefaultBiomes.tres" id="10_povum"]
 
 [sub_resource type="Resource" id="Settings_world"]
 script = ExtResource("3_settings")
